@@ -237,3 +237,6 @@ planning.
 *   [Multi-Zone and Regional Clusters](https://cloud.google.com/kubernetes-engine/docs/concepts/multi-zone-and-regional-clusters)
 *   [Affinity and Anti-Affinity](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity)
 *   [readinessProbes](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-probes)
+
+
+**This is not an officially supported Google product**
