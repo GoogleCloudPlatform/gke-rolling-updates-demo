@@ -35,6 +35,7 @@ command -v jq >/dev/null || fail "jq is not installed!"
 
 # Source the properties file
 if [ -f "${REPO_HOME}/.env" ] ; then
+  # shellcheck disable=SC1091
   source "${REPO_HOME}/.env"
 else
   echo "ERROR: Define a properties file '.env'"

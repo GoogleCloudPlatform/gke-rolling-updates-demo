@@ -165,7 +165,8 @@ The cluster creation, upgrade, and validation can be run with one command:
 ## Validation
 
 During upgrades and downgrades, each node will take several minutes to replace.
-You can monitor the progress in another terminal as the cluster changes proceed.
+You can monitor the progress in another terminal or cloud console as the
+cluster changes proceed.
 
 *   While the control plane is upgrading, you can verify that Regional
     Kubernetes Engine clusters have an HA control plane by querying the API
@@ -207,12 +208,16 @@ You can monitor the progress in another terminal as the cluster changes proceed.
 
     Find the IP address of the `hello-server` Service Load Balancer and test
     the ip in your browser. (`<External-IP:8080`)
+
     ```console
     kubectl get svc
     NAME           TYPE           CLUSTER-IP     EXTERNAL-IP      PORT(S)          AGE
-    hello-server   LoadBalancer   10.39.246.40   35.196.132.193   8080:31766/TCP   2m
+    hello-server   LoadBalancer   10.39.246.40   35.237.184.173   8080:31766/TCP   2m
     kubernetes     ClusterIP      10.39.240.1    <none>           443/TCP          50m
     ```
+
+    ![hello-app-from-browser](../images/hello-app-browser.png)
+
 *   **Completed Upgrade:** After the upgrade steps have been completed, the
     `validation.sh` script will check the control plane version and each
     node's version.  Execute it from within this directory:
@@ -225,6 +230,8 @@ You can monitor the progress in another terminal as the cluster changes proceed.
     Control plane is upgraded to 1.10.4-gke.2!
     Validating the Nodes...
     All nodes upgraded to 1.10.4-gke.2!
+    Validating the number of hello-server pods running...
+    All hello-server pods have been running.
     ```
 
 
@@ -238,7 +245,12 @@ file and can be deleted with terraform:
 
 ## Troubleshooting
 
-1.  `default credentials` Error, or `Permission Denied` when running Terraform:
+* `Currently upgrading cluster` Error:
+  ```
+  ERROR: (gcloud.container.node-pools.delete) ResponseError: code=400, message=Operation operation-1529415957904-496c7278 is currently upgrading cluster blue-green-test. Please wait and try again once it is done.
+  ```
+
+* `default credentials` Error, or `Permission Denied` when running Terraform:
     ```console
     * provider.google: google: could not find default credentials. See https://developers.google.com/accounts/docs/application-default-credentials for more information.
     ```
@@ -247,13 +259,19 @@ file and can be deleted with terraform:
     ```console
     gcloud auth application-default login
     ```
-2.  Kubernetes Engine update failures:
+*  Kubernetes Engine update failures:
     An audit log of all cluster operations is kept by the system. All completed
     updates as well as in-progress updates can be inspected:
     ```console
-    gcloud beta container operations list
-    gcloud beta container operations describe [OPERATION_ID]
+    gcloud container operations list
+    gcloud container operations describe [OPERATION_ID]
     ```
+*  Some operations have been observed to take longer thant the defaults
+    the next timeouts have been used in Terraform scripts
+    create = "30m" // default 30m
+    update = "15m" // default 10m
+    delete = "15m" // default 10m
+    They can be set or updated in case any issues during running the scripts.
 
 ## Relevant Material
 

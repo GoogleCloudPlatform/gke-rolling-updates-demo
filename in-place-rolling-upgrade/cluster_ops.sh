@@ -55,34 +55,44 @@ fi
 
 # Source the configuration file if it exists
 if [ -f "${REPO_HOME}/.env" ] ; then
+  # shellcheck disable=SC1091
   source "${REPO_HOME}/.env"
 fi
 
 # Set GCLOUD_ZONE to default if it has not yet been set
-if [ -z ${GCLOUD_ZONE:+exists} ]; then
-  GCLOUD_ZONE=$(gcloud config get-value compute/zone)
-  export GCLOUD_ZONE
-  if [ "$GCLOUD_ZONE" == "(unset)" ]; then
-    fail "GCLOUD_ZONE is not set"
-  fi
+GCLOUD_ZONE_DEFAULT=$(gcloud config get-value compute/zone)
+if [ "${GCLOUD_ZONE_DEFAULT}" == "(unset)" ]; then
+ # check if defined in env file
+ if [ -z ${GCLOUD_ZONE:+exists} ]; then
+   fail "GCLOUD_ZONE is not set"
+ fi
+else
+ GCLOUD_ZONE="$GCLOUD_ZONE_DEFAULT"
+ export GCLOUD_ZONE
 fi
 
 # Set GCLOUD_REGION to default if it has not yet been set
-if [ -z ${GCLOUD_REGION:+exists} ]; then
-  GCLOUD_REGION=$(gcloud config get-value compute/region)
-  export GCLOUD_REGION
-  if [ "${GCLOUD_REGION}" == "(unset)" ]; then
-    fail "GCLOUD_REGION is not set"
-  fi
+GCLOUD_REGION_DEFAULT=$(gcloud config get-value compute/region)
+if [ "${GCLOUD_REGION_DEFAULT}" == "(unset)" ]; then
+ # check if defined in env file
+ if [ -z ${GCLOUD_REGION:+exists} ]; then
+   fail "GCLOUD_REGION is not set"
+ fi
+else
+ GCLOUD_REGION="$GCLOUD_REGION_DEFAULT"
+ export GCLOUD_REGION
 fi
 
 # Set GCLOUD_PROJECT to default if it has not yet been set
-if [ -z ${GCLOUD_PROJECT:+exists} ]; then
-  GCLOUD_PROJECT=$(gcloud config get-value core/project)
-  export GCLOUD_PROJECT
-  if [ "$GCLOUD_PROJECT" == "(unset)" ]; then
-    fail "GCLOUD_PROJECT is not set"
-  fi
+GCLOUD_PROJECT_DEFAULT=$(gcloud config get-value project)
+if [ "${GCLOUD_PROJECT_DEFAULT}" == "(unset)" ]; then
+ # check if defined in env file
+ if [ -z ${GCLOUD_PROJECT:+exists} ]; then
+   fail "GCLOUD_PROJECT is not set"
+ fi
+else
+ GCLOUD_PROJECT="$GCLOUD_PROJECT_DEFAULT"
+ export GCLOUD_PROJECT
 fi
 
 if [ -z ${CLUSTER_NAME:+exists} ]; then
@@ -111,13 +121,14 @@ terraform_apply() {
     -var region="${GCLOUD_REGION}" \
     -var zone="${GCLOUD_ZONE}"
 
-  terraform apply \
+  terraform apply -input=false -auto-approve \
     -var control_plane_version="${CONTROL_PLANE_VERSION}" \
     -var node_pool_version="${NODE_POOL_VERSION}" \
     -var machine_type="${MACHINE_TYPE}" \
     -var num_nodes="${NUM_NODES}" \
     -var region="${GCLOUD_REGION}" \
     -var zone="${GCLOUD_ZONE}"
+
 }
 
 create_cluster() {
@@ -160,8 +171,10 @@ tear_down() {
     -var machine_type="${MACHINE_TYPE}" \
     -var num_nodes="${NUM_NODES}" \
     -var region="${GCLOUD_REGION}" \
-    -var zone="${GCLOUD_ZONE}"
-
+    -var zone="${GCLOUD_ZONE}" \
+    -var timeout_create="${TIMEOUT_CREATE}" \
+    -var timeout_update="${TIMEOUT_UPDATE}" \
+    -var timeout_delete="${TIMEOUT_DELETE}"
 }
 
 auto() {

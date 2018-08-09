@@ -35,6 +35,7 @@ command -v jq >/dev/null || fail "jq is not installed!"
 
 # Source the properties file
 if [ -f "${REPO_HOME}/.env" ] ; then
+  # shellcheck disable=SC1091
   source "${REPO_HOME}/.env"
 else
   echo "ERROR: Define a properties file '.env'"
@@ -83,6 +84,24 @@ validate_nodes() {
   return 0
 }
 
+# Validate for correct number of hello-server pods
+# Return:
+# 0 - when all pods running
+# 1 - when not all pods running
+validate_pods() {
+  # Find the current number of running pods
+  PODS_AVAILABLE=$(kubectl get deployment hello-server \
+    -o jsonpath='{.status.availableReplicas}')
+  PODS_REQUEST=$(kubectl get deployments hello-server \
+    -o jsonpath='{.status.replicas}')
+  if ! [[ "${PODS_AVAILABLE}" == "${PODS_REQUEST}" ]]; then
+    echo -n "ERROR: ${PODS_AVAILABLE} available pods, "
+    echo "but should be ${PODS_REQUEST}"
+    return 1
+  fi
+  return 0
+}
+
 # Validates that the upgrade was completed
 validate() {
   echo "Validating the control plane version..."
@@ -96,6 +115,13 @@ validate() {
     echo "All nodes upgraded to ${NEW_GKE_VER}!"
   else
     echo "ERROR: Not all nodes have been upgraded."
+    exit 1
+  fi
+  echo "Validating the number of hello-server pods running..."
+  if validate_pods ; then
+    echo "All hello-server pods are running."
+  else
+    echo "ERROR: Not all pods available yet."
     exit 1
   fi
   return 0

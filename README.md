@@ -44,7 +44,7 @@ format.  A Kubernetes Engine version will take the form of `X.Y.Z-gke.N`, where:
 *   `X` - Kubernetes major version
 *   `Y` - Kubernetes minor version
 *   `Z` - Kubernetes patch version
-*   `N` - Kubernetes patch version
+*   `N` - Kubernetes Engine patch version
 
 The `X.Y.Z` portion corresponds directly with the Open Source Kubernetes
 version of the same number and is fully compatible.  The various Kubernetes
@@ -132,7 +132,7 @@ Notes](https://cloud.google.com/kubernetes-engine/release-notes) to ensure that 
 ## Regional vs Multi-Zone Clusters
 
 Regional cluster has multi-node highly available control plane.  This allows
-zero-downtime upgrades for control plane and 5 9s of availability.  Three
+zero-downtime upgrades for control plane and five 9s of availability.  Three
 different zones are selected automatically at cluster creation time and one
 control plane node is run in each.  The Node Pools are also spread out among
 the three zones.
@@ -165,7 +165,6 @@ They include but are not limited to:
 *   Using `readinessProbes` to ensure that after rescheduled application
     instances are started they are fully initialized and operational before
     being marked "healthy".
-*   MOAR
 
 ## Upgrade Strategies
 
@@ -187,7 +186,7 @@ Each node is cordoned, drained, terminated, and finally replaced with a new
 node running the new version.  This works well in large clusters that tend
 to have significant resource head room.
 
-**In Place Rolling Upgrade](in-place-rolling-upgrade) Example**
+**[In Place Rolling Upgrade](in-place-rolling-upgrade) Example**
 
 ### Expand and Contract Upgrade
 
@@ -212,7 +211,7 @@ running the new version in the order and timing deemed appropriate.
 ## Downgrades
 
 **Downgrading the control plane is not possible.**  If you find a unexpected
-behaviors during a Node Pool upgrade, you can abort and downgrade the Node Pool
+behaviors during a Node Pool upgrade, you can abort and roll back the Node Pool
 to the previous version.
 
 ## Kubernetes Engine and Change Control
@@ -229,6 +228,14 @@ planning.
 *   Since control plane downgrades are not possible, create/maintain a
     development or staging cluster with identical application workload types to
     test fully upgrades prior to applying them in your production environments.
+
+## Manual upgrade process
+
+Manual upgrades require different considerations and planning depending on
+the type of upgrade.  The following decision tree illustrates a high-level
+overview of a manual upgrade of a Kubernetes Engine cluster.
+
+![manual-upgrade](images/manual-upgrade.png)
 
 ## Relevant Material
 

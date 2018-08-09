@@ -42,12 +42,13 @@ nodes to be migrated to the new Kubernetes Engine version one at a time as the
 operator sees fit.
 
 This example will walk through creating a Kubernetes Engine cluster, deploying
-an application, upgrading the Kubernetes Engine Control Plane, creating the new
-node pool, migrating the application to the new node pool, and terminating the
-old node pool.
+an Elasticsearch cluster, loading an index containing the works of Shakespeare,
+upgrading the Kubernetes Engine Control Plane, creating the new node pool,
+migrating the application to the new node pool, and terminating the old node
+pool.
 
-To complete this example, you will run `scripts/clutser_ops.sh` contained in
-this repository. It uses the `gcloud` and `kubectl` commands to interact with
+To complete this example, you will run `cluster_ops.sh` contained in
+this directory. It uses the `gcloud` and `kubectl` commands to interact with
 the Google Cloud Platform and the Kubernetes Engine cluster.
 
 It has been noted by many in the Kubernetes community that running stateful
@@ -67,10 +68,10 @@ Make sure you have installed and access to the following:
 1.  [gcloud](https://cloud.google.com/sdk/downloads) (Google Cloud SDK version >= 200.0.0)
 1.  [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/) >= 1.10.4
 1.  bash or bash compatible shell
+1.  [watch](https://en.wikipedia.org/wiki/Watch_(Unix)
 1.  [jq](https://stedolan.github.io/jq/)
-1.  A Google Cloud Platform project with the containers api enabled.
+1.  A Google Cloud Platform project with the Kubernetes Engine API enabled.
     ```
-    gcloud services list
     gcloud services enable container.googleapis.com
     ```
 
@@ -111,16 +112,24 @@ the cluster and application during the upgrade procedure.
 1.  **Create the Kubernetes Engine cluster:**
     The `create` action will create a regional Kubernetes Engine Cluster and
     deploy the example application.
+
     ```console
     ./cluster_ops.sh create
     ```
+
     You will be prompted to continue, input `Y`.  After a few minutes the
-    Kubernetes Engine cluster will be created and an application will be
-    installed.  The last several lines of output will look like this:
+    Kubernetes Engine cluster will be created, the Elasticearch cluster will be
+    installed, and an index containing the works of Shakespeare will loaded. The
+    last several lines of output will look like this:
+
     ```console
-      Installing Hello App
-      deployment.apps "hello-server" created
-      service "hello-server" created
+    Creating the Shakespeare index
+    {"acknowledged":true,"shards_acknowledged":true,"index":"shakespeare"}
+    Loading Shakespeare sample data into Elasticsearch
+      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                     Dload  Upload   Total   Spent    Left  Speed
+    100 62.6M  100 38.5M  100 24.1M  1642k  1029k  0:00:24  0:00:24 --:--:-- 3719k
+    Sample data successfully loaded!
     ```
 
 1.  **Upgrade the control plane:**
@@ -169,7 +178,7 @@ the cluster and application during the upgrade procedure.
     a single pod at a time and monitor the application's health before
     introducing more disruptions.  Once all stateful applications have been
     migrated, you can migrate the remaining workloads one node at a time with
-    the `drain` command.  Migrate the example app with each of the following:
+    the `drain` command.
 
     * Migrate a single pod
       ```console
@@ -179,10 +188,104 @@ the cluster and application during the upgrade procedure.
       ```console
       kubectl drain <node-name> --delete-local-data --ignore-daemonsets [--force]
       ```
-    * Migrate the rest of the nodes in the default pool:
-      ```console
-      ./cluster_ops.sh drain-default-pool
-      ```
+
+    ###### Migrating Elasticsearch Master Nodes
+
+    The Elasticsearch cluster has one Master node and two "Master Eligible"
+    nodes.  When the Master is deleted, the remaining nodes will re-elect a new
+    master.  The new master will then update the cluster state and publish the
+    new state to all members of the cluster.  During this time period (40-60s)
+    all cluster level API calls and many index metadata API calls like the ones
+    below will fail with a timeout:
+
+    ```console
+    /_cluster/health
+    /_cat/master
+    /_cat/indices
+    /_cat/shards
+    ```
+
+    Search API queries should continue without interruption:
+
+    ```console
+    /shakespeare/_search?q=happy%20dagger
+    ```
+
+    To minimize the number of Master re-elections, determine the current master
+    and migrate the 2 Master Eligible nodes first:
+
+    First, set up a port-forward between the Elasticsearch client service and
+    your workstation's localhost:
+
+    ```console
+    kubectl port-forward svc/elasticsearch 9200
+    ```
+
+    This API call will display the current master:
+
+    ```console
+    curl localhost:9200/_cat/master
+    ```
+
+    The current Master pod name is the 4th column.
+
+    ```console
+    gxcdTgBpRoejJGZSZYI7kA 10.12.2.3 10.12.2.3 es-master-5bf75c4d7b-rd67l
+    ```
+
+    Find the other two Master Eligible nodes:
+
+    ```console
+    kubectl get pods -l component=elasticsearch,role=master
+    ```
+
+    The Master and Master Eligible nodes are displayed:
+
+    ```console
+    NAME                         READY     STATUS    RESTARTS   AGE
+    es-master-5bf75c4d7b-2pnlh   1/1       Running   0          10m
+    es-master-5bf75c4d7b-7mkcf   1/1       Running   0          10m
+    es-master-5bf75c4d7b-rd67l   1/1       Running   0          10m
+    ```
+
+    Delete one of the Master Eligible nodes
+
+    ```console
+    kubectl delete pod es-master-5bf75c4d7b-2pnlh
+    ```
+    Watch the cluster health in a loop (see the **Application Health** heading in
+    the [Troubleshooting](#troubleshooting) section below) and wait for the new Master Eligible
+    node to join the cluster.  Once the cluster state has returned to normal,
+    delete the other Master Eligible Node pod.  Again, wait for the new Master
+    Eligible Node to join the cluster.  Finally, delete the Master.  Confirm
+    that search queries continue to work while the Master re-election occurs.
+
+    ###### Migrating Elasticsearch Data nodes
+
+    The data nodes can be migrated in any order but care must be taken to ensure
+    that the data is available throughout the migration process.  The
+    Shakespeare index is split into 5 `primary shards`, and 1 `replica shard` per
+    `primary shard`. This gives a total of `5 x 2 = 10` shards that are spread
+    out among the data nodes.  Elasticsearch ensures that a `primary shard's`
+    corresponding `replica shard` will not be located on the same data node
+    whenever possible.
+
+    Delete the data nodes one at a time while watching the cluster health in a
+    loop.  After deleting a data node, the cluster `status` will change to
+    `yellow`.  This means that all `primary shards` are active but not all
+    `replica shards` are available.  After the new data node is created, it will
+    take some time further for the cluster to ensure all shards are properly
+    allocated across the data nodes and return to the `green` `status`.
+
+    ###### Migrating the rest of the pods
+
+    Now that the Elasticsearch Master and Data nodes have been migrated to the
+    new node pool, the rest of the workloads are stateless and can be quickly
+    migrated one node-pool node at a time.
+    Migrate the rest of the nodes in the default pool:
+    ```console
+    ./cluster_ops.sh drain-default-pool
+    ```
 
 
 1.  **Delete the old node pool:** Now that all workloads have been migrated to
@@ -252,6 +355,10 @@ The cluster creation, upgrade, and validation can be run with one command:
     gcloud container operations describe <OPERATION_ID> \
       --region <GCLOUD_REGION>
     ```
+    ** Cloud console monitoring:** You can monitor the progress of cluster upgrades
+    using GCP console under Kubernetes Engine, select your cluster and monitor
+    the process/progress in %.
+
 *   **Default node pool cordon:** After the control plane is upgraded, you can
     verify that the default node pool has been cordoned:
     ```console
@@ -273,27 +380,64 @@ The cluster creation, upgrade, and validation can be run with one command:
     ```console
     kubectl get pods --all-namespaces
     ```
-*   **Application Health:** Throughout all upgrade steps an HA application
+
+*   **Application Health:** Throughout all upgrade steps, an HA application
     with appropriate number of pods should continue running uninterrupted.  The
-    hello app in this example will continue serving requests as long as one pod
-    is available.
+    Elasticsearch cluster in this example will continue serving search queries
+    as long as the cluster health is `green` or `yellow`.  It has 3 Data Nodes,
+    3 Client Nodes, and 3 Master Eligible Nodes with one elected Master.
 
-    Find the `EXTERNAL-IP` address of the `hello-server` Service Load Balancer
-    and test the ip in your browser.
-    ```console
-    kubectl get svc
-    NAME           TYPE           CLUSTER-IP     EXTERNAL-IP      PORT(S)          AGE
-    hello-server   LoadBalancer   10.39.246.40   35.196.132.193   8080:31766/TCP   2m
-    kubernetes     ClusterIP      10.39.240.1    <none>           443/TCP          50m
-    ```
-    The `hello-app` looks like this in a browser:
-    ![hell-app](images/hello-app-browser.png)
+    If you have not already, set up a port-forward to the Elasticsearch client
+    service to your workstation's localhost:
 
-    You can also test the endpoint in a loop to confirm that it does not become
-    unavailable:
     ```console
-    `while sleep 1; do curl -s -o /dev/null -w "Status Code:%{http_code}\n" http://<EXTERNAL-IP> ; done`
+    kubectl port-forward svc/elasticsearch 9200
     ```
+
+    Then in another terminal check the cluster health in a loop:
+
+    ```console
+    while true; do \
+        date "+%H:%M:%S,%3N" \
+        curl --max-time 1 'http://localhost:9200/_cluster/health' | jq .
+        echo "" \
+        sleep 1 \
+    done
+    ```
+
+    A healthy cluster with all nodes available will look like this:
+
+    ```console
+    {
+      "cluster_name": "myesdb",
+      "status": "green",
+      "timed_out": false,
+      "number_of_nodes": 9,
+      "number_of_data_nodes": 3,
+      "active_primary_shards": 5,
+      "active_shards": 10,
+      "relocating_shards": 0,
+      "initializing_shards": 0,
+      "unassigned_shards": 0,
+      "delayed_unassigned_shards": 0,
+      "number_of_pending_tasks": 0,
+      "number_of_in_flight_fetch": 0,
+      "task_max_waiting_in_queue_millis": 0,
+      "active_shards_percent_as_number": 100
+    }
+    ```
+
+    In yet another terminal window, you can run a loop to test the availability
+    of the search API which should continue working during a Master re-election:
+    ```console
+    while true; do \
+        date "+%H:%M:%S,%3N" \
+        curl --max-time 1 'http://localhost:9200/shakespeare/_search?q=happy%20dagger'
+        echo "" \
+        sleep 1 \
+    done
+    ```
+
 *   **Completed Upgrade:** After the upgrade steps have been completed, the
     `validation.sh` script will check the control plane version and each
     node's version.  Execute it from within this directory:
@@ -306,6 +450,8 @@ The cluster creation, upgrade, and validation can be run with one command:
     Control plane is upgraded to 1.10.4-gke.2!
     Validating the Nodes...
     All nodes upgraded to 1.10.4-gke.2!
+    Validating the number of hello-server pods running...
+    All hello-server pods have been running.
     ```
 
 
@@ -318,6 +464,10 @@ during this example run the following command:
 ```
 
 ## Troubleshooting
+
+* `E0717 09:45:59.417020    1245 portforward.go:178] lost connection to pod`
+  The port-forward command will occasionally fail, especially as the cluster is
+  being manipulated.  Execute the command to reconnect.
 
 * `Currently upgrading cluster` Error:
   ```
