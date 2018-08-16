@@ -18,19 +18,18 @@ limitations under the License.
 // This will create a GKE cluster with the values supplied in the region,
 // control_plane_version, and node_pool_version variables.
 
-
 // Data Source to find avaiable gke versions in a specific zone
 // https://www.terraform.io/docs/providers/google/d/google_container_engine_versions.html
 data "google_container_engine_versions" "my_zone" {
   zone = "${var.zone}"
 }
 
-
 // This resource creates an HA Regional GKE cluster
 // https://www.terraform.io/docs/providers/google/r/container_cluster.html
 resource "google_container_cluster" "test" {
-  name               = "rolling-upgrade-test"
-  region             = "${var.region}"
+  name   = "rolling-upgrade-test"
+  region = "${var.region}"
+
   // in a regional cluster, this is the number of nodes per zone
   initial_node_count = "${var.num_nodes}"
 
@@ -44,8 +43,8 @@ resource "google_container_cluster" "test" {
 
   // Some operations have been observed to take longer thant the defaults
   timeouts {
-    create = "30m" // default 30m
-    update = "15m" // default 10m
-    delete = "15m" // default 10m
+    create = "${var.timeout_create}"
+    update = "${var.timeout_update}"
+    delete = "${var.timeout_delete}"
   }
 }

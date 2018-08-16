@@ -35,6 +35,7 @@ command -v jq >/dev/null || fail "jq is not installed!"
 
 # Source the properties file
 if [ -f "${REPO_HOME}/.env" ] ; then
+  # shellcheck disable=SC1091
   source "${REPO_HOME}/.env"
 else
   echo "ERROR: Define a properties file '.env'"
@@ -133,6 +134,81 @@ validate_nodes() {
   return 0
 }
 
+validate_elasticsearch() {
+  # Check the number of master nodes
+  MASTERS_AVAILABLE=$(kubectl get deployment es-master \
+    -o jsonpath='{.status.availableReplicas}')
+  MASTERS_REQUEST=$(kubectl get deployment es-master \
+    -o jsonpath='{.spec.replicas}')
+
+  if ! [[ "${MASTERS_REQUEST}" == "${MASTERS_AVAILABLE}" ]]; then
+    echo -n "ERROR: ${MASTERS_AVAILABLE} master nodes available, but should be "
+    echo "${MASTERS_REQUEST}"
+    return 1
+  else
+    echo "Found ${MASTERS_AVAILABLE} master nodes."
+  fi
+
+  # Check the number of client nodes
+  CLIENTS_AVAILABLE=$(kubectl get deployment es-client \
+    -o jsonpath='{.status.availableReplicas}')
+  CLIENTS_REQUEST=$(kubectl get deployment es-client \
+    -o jsonpath='{.spec.replicas}')
+
+  if ! [[ "${CLIENTS_REQUEST}" == "${CLIENTS_AVAILABLE}" ]]; then
+    echo -n "ERROR: ${CLIENTS_AVAILABLE} master nodes available, but should be "
+    echo "${MASTERS_REQUEST}"
+    return 1
+  else
+    echo "Found ${CLIENTS_AVAILABLE} client nodes."
+  fi
+
+  # Check the number of data nodes
+  DATA_AVAILABLE=$(kubectl get sts es-data \
+    -o jsonpath='{.status.readyReplicas}')
+  DATA_REQUEST=$(kubectl get sts es-data \
+    -o jsonpath='{.spec.replicas}')
+
+  if ! [[ "${DATA_REQUEST}" == "${DATA_AVAILABLE}" ]]; then
+    echo -n "ERROR: ${DATA_AVAILABLE} master nodes available, but should be "
+    echo "${DATA_REQUEST}"
+    return 1
+  else
+    echo "Found ${DATA_AVAILABLE} data nodes."
+  fi
+
+  echo "Setting up port-forward to Elasticsearch Client..."
+  kubectl port-forward svc/elasticsearch 9200:9200 1>&2>/dev/null &
+  sleep 4
+  # Check for Shakespeare search index
+  SHAKESPEARE_INDEX=$(curl -o /dev/null -w "%{http_code}" http://localhost:9200/shakespeare 2>/dev/null)
+  if ! [[ "$SHAKESPEARE_INDEX" == "200" ]]; then
+    echo "ERROR: Shakespeare Index is not available."
+    return 1
+  else
+    echo "Shakespeare index is available."
+  fi
+
+  # Perform a text search
+  JULIET_LINE=$(curl \
+    'http://localhost:9200/shakespeare/_search?q=happy%20dagger' 2>/dev/null \
+    | jq -r '.hits.hits[] |
+        select(._source.play_name == "Romeo and Juliet") |
+        select(._source.line_number == "5.3.177") | ._source.text_entry')
+  EXPECTED_LINE="Yea, noise? then Ill be brief. O happy dagger!"
+  if ! [[ "${JULIET_LINE}" == "${EXPECTED_LINE}" ]]; then
+    echo "ERROR: Juliet's line is not here!"
+    return 1
+  else
+    echo "Text search succeeded:"
+    echo "Juliet: \"${JULIET_LINE}\""
+  fi
+
+  pkill -P $$
+
+  return 0
+}
+
 # Validates that the upgrade was completed
 validate() {
   echo "Validating the control plane version..."
@@ -148,7 +224,13 @@ validate() {
     echo "ERROR: Not all nodes have been upgraded."
     exit 1
   fi
-  return 0
+  echo "Validating the Elasticsearch Cluster..."
+  if validate_elasticsearch ; then
+    echo "Elasticsearch is validated!"
+  else
+    echo "ERROR: Elasticsearch cluster was not validated."
+  fi
+  exit 0
 }
 
 # Time to validate

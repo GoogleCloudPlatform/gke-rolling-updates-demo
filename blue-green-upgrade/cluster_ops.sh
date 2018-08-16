@@ -57,6 +57,7 @@ fi
 
 # Source the properties file
 if [ -f "${REPO_HOME}/.env" ] ; then
+  # shellcheck disable=SC1091
   source "${REPO_HOME}/.env"
 else
   echo "ERROR: Define a properties file '.env'"
@@ -67,23 +68,30 @@ CLOUDSDK_CORE_DISABLE_PROMPTS=0
 export CLOUDSDK_CORE_DISABLE_PROMPTS
 
 # Set GCLOUD_REGION to default if it has not yet been set
-if [ -z ${GCLOUD_REGION:+exists} ]; then
-  GCLOUD_REGION=$(gcloud config get-value compute/region)
-  export GCLOUD_REGION
-  if [ "${GCLOUD_REGION}" == "(unset)" ]; then
-    fail "GCLOUD_REGION is not set"
-  fi
+GCLOUD_REGION_DEFAULT=$(gcloud config get-value compute/region)
+if [ "${GCLOUD_REGION_DEFAULT}" == "(unset)" ]; then
+ # check if defined in env file
+ if [ -z ${GCLOUD_REGION:+exists} ]; then
+   fail "GCLOUD_REGION is not set"
+ fi
+else
+ GCLOUD_REGION="$GCLOUD_REGION_DEFAULT"
+ export GCLOUD_REGION
 fi
 
 # Set GCLOUD_PROJECT to default if it has not yet been set
-if [ -z ${GCLOUD_PROJECT:+exists} ]; then
-  GCLOUD_PROJECT=$(gcloud config get-value core/project)
-  export GCLOUD_PROJECT
-  if [ "${GCLOUD_PROJECT}" == "(unset)" ]; then
-    fail "GCLOUD_PROJECT is not set"
-  fi
+GCLOUD_PROJECT_DEFAULT=$(gcloud config get-value project)
+if [ "${GCLOUD_PROJECT_DEFAULT}" == "(unset)" ]; then
+ # check if defined in env file
+ if [ -z ${GCLOUD_PROJECT:+exists} ]; then
+   fail "GCLOUD_PROJECT is not set"
+ fi
+else
+ GCLOUD_PROJECT="$GCLOUD_PROJECT_DEFAULT"
+ export GCLOUD_PROJECT
 fi
 
+# Set CLUSTER_NAME
 if [ -z ${CLUSTER_NAME:+exists} ]; then
   CLUSTER_NAME="blue-green-test"
   export CLUSTER_NAME
@@ -106,11 +114,55 @@ if [[ $# -lt 1 ]]; then
   usage
 fi
 
+load_data() {
+  echo "Setting up port-forward to Elasticsearch client"
+  kubectl port-forward svc/elasticsearch 9200 1>&2>/dev/null &
+  # Wait a couple seconds for connection to establish as that last command is
+  # not blocking
+  sleep 5
+
+  echo "Creating the Shakespeare index"
+  # The mapping file creates the index and sets the metadata needed by
+  # Elasticsearch to parse the actual data
+  curl -H "Content-Type: application/json" \
+    -X PUT \
+    -d @"${REPO_HOME}/data/mapping.json" \
+    'http://localhost:9200/shakespeare'
+  # The response does not make include a newline
+  echo ""
+
+  # Here we load the actual data.
+  echo "Loading Shakespeare sample data into Elasticsearch"
+  curl -H "Content-Type: application/x-ndjson" \
+    -X POST \
+    --data-binary @"${REPO_HOME}/data/shakespeare.json" \
+    'http://localhost:9200/shakespeare/doc/_bulk?pretty' > /dev/null
+
+  # If we've made it this far the data is loaded
+  echo "Sample data successfully loaded!"
+
+  pkill -P $$
+}
+
 # Installs the hello appF
 install_app() {
-  echo "Installing Hello App"
-  kubectl create -f "${REPO_HOME}/manifests/hello-server.yaml"
-  kubectl create -f "${REPO_HOME}/manifests/hello-svc.yaml"
+  echo "Installing Elasticsearch Cluster"
+  kubectl create -f "${REPO_HOME}/manifests/es-discovery-svc.yaml"
+  kubectl create -f "${REPO_HOME}/manifests/es-svc.yaml"
+  kubectl create -f "${REPO_HOME}/manifests/es-master-pdb.yaml"
+  kubectl create -f "${REPO_HOME}/manifests/es-master.yaml"
+  kubectl rollout status -f "${REPO_HOME}/manifests/es-master.yaml"
+
+  kubectl create -f "${REPO_HOME}/manifests/es-client-pdb.yaml"
+  kubectl create -f "${REPO_HOME}/manifests/es-client.yaml"
+  kubectl rollout status -f "${REPO_HOME}/manifests/es-client.yaml"
+
+  kubectl create -f "${REPO_HOME}/manifests/es-data-svc.yaml"
+  kubectl create -f "${REPO_HOME}/manifests/es-data-pdb.yaml"
+  kubectl create -f "${REPO_HOME}/manifests/es-data-stateful.yaml"
+  kubectl rollout status -f "${REPO_HOME}/manifests/es-data-stateful.yaml"
+
+  load_data
 }
 
 create_cluster() {
@@ -264,6 +316,12 @@ case "${ACTION}" in
   create)
     create_cluster
     ;;
+  install-app)
+    install_app
+    ;;
+  load-data)
+    load_data
+    ;;
   upgrade-control)
     upgrade_control
     ;;
@@ -278,9 +336,6 @@ case "${ACTION}" in
     ;;
   delete-default-pool)
     delete_default_pool
-    ;;
-  install-app)
-    install_app
     ;;
   delete)
     tear_down

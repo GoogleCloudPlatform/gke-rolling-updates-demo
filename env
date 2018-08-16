@@ -29,8 +29,11 @@ export GCLOUD_PROJECT=
 export NUM_NODES=1
 
 # MACHINE_TYPE - An instance available in your selected region, find available
-# machine types with the `gcloud compute machine-type list` command.
-export MACHINE_TYPE=n1-standard-1
+# machine types with the `gcloud compute machine-type list` command.  The
+# default setting here is the sufficient for all three examples in this
+# repository, however, the in-place-rolling-upgrade example can work in a 3
+# node cluster using the n1-standard-1 machine type.
+export MACHINE_TYPE=n1-standard-4
 
 
 ###############################################################################
@@ -61,3 +64,14 @@ export NEW_GKE_VER=
 # GCLOUD_ZONE - the Google Compute zone to use, needed by the terraform
 # google_container_engine_versions data provider
 export GCLOUD_ZONE=
+
+# Timeouts: Some operations have been observed to take longer thant the defaults
+# Here they can be changed
+# timeouts {
+#    create = "30m" // default 30m
+#    update = "15m" // default 10m
+#    delete = "15m" // default 10m
+#  }
+export TIMEOUT_CREATE="30m"
+export TIMEOUT_UPDATE="15m"
+export TIMEOUT_DELETE="15m"

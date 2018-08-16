@@ -173,15 +173,19 @@ Checking the appropriate api's are enabled .....
     ./cluster_ops.sh create
     ```
 
-    After a few minutes the Kubernetes Engine cluster will be created and
-    "hello-server" app will be installed. The last several lines of output will
-    look like this:
+    After a few minutes the Kubernetes Engine cluster will be created, the
+    Elasticearch cluster will be installed, and an index containing the works
+    of Shakespeare will loaded. The last several lines of output will look like
+    this:
 
     ```console
-    Setting up the application .....
-
-    deployment.apps "hello-server" created
-    service "hello-server" created
+    Creating the Shakespeare index
+    {"acknowledged":true,"shards_acknowledged":true,"index":"shakespeare"}
+    Loading Shakespeare sample data into Elasticsearch
+      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                     Dload  Upload   Total   Spent    Left  Speed
+    100 62.6M  100 38.5M  100 24.1M  1642k  1029k  0:00:24  0:00:24 --:--:-- 3719k
+    Sample data successfully loaded!
     ```
 
 1.  **Increase size of the Kubernetes Engine node pool:**
@@ -263,6 +267,7 @@ Checking the appropriate api's are enabled .....
     ```
 
 ### Automated Deployment
+
 The cluster creation, upgrade, and validation can be run with one command:
 ```console
 ./cluster_ops.sh auto
@@ -294,11 +299,15 @@ The cluster creation, upgrade, and validation can be run with one command:
     upgrades will be listed. Find the appropriate operation ID to get details
     of an upgrade.
 
-    ```console
+        ```console
     gcloud container operations list
     gcloud container operations describe <OPERATION_ID> \
       --region <cluster-region>
     ```
+
+*   **Cloud console monitoring** You can also monitor the progress of cluster
+    upgrades under GCP Kubernetes Engine, select your cluster and see the progress
+    showing in %.
 
 *   **Rescheduling:** As pods are deleted and nodes are drained, you can view
     the progress of rescheduling:
@@ -307,23 +316,63 @@ The cluster creation, upgrade, and validation can be run with one command:
     kubectl get pods --all-namespaces
     ```
 
-*   **Application Health:** Throughout all upgrade steps an HA application
-    with appropriate number of pods should continue running uninterrupted. The
-    cluster in this example can continue running with the loss of one master
-    pod and one data pod at a time.
+*   **Application Health:** Throughout all upgrade steps, an HA application
+    with appropriate number of pods should continue running uninterrupted.  The
+    Elasticsearch cluster in this example will continue serving search queries
+    as long as the cluster health is `green` or `yellow`.  It has 3 Data Nodes,
+    3 Client Nodes, and 3 Master Eligible Nodes with one elected Master.
 
-    Find the `EXTERNAL-IP` address of the `hello-server` Service Load Balancer
-    and test the ip in your browser.
+    In one terminal, configure a port-forward from the elasticsearch service to
+    your workstation's localhost:
 
     ```console
-    kubectl get svc
-    NAME           TYPE           CLUSTER-IP     EXTERNAL-IP      PORT(S)          AGE
-    hello-server   LoadBalancer   10.39.246.40   35.196.132.193   8080:31766/TCP   2m
-    kubernetes     ClusterIP      10.39.240.1    <none>           443/TCP          50m
+    kubectl port-forward svc/elasticsearch 9200
     ```
 
-    The `hello-app` looks like this in a browser:
-    ![hello-app](images/hello-app-browser.png)
+    Then in another terminal check the cluster health in a loop:
+
+    ```console
+    while true; do \
+        date "+%H:%M:%S,%3N" \
+        curl --max-time 1 'http://localhost:9200/_cluster/health' | jq .
+        echo "" \
+        sleep 1 \
+    done
+    ```
+
+    A healthy cluster with all nodes available will look like this:
+
+    ```console
+    {
+      "cluster_name": "myesdb",
+      "status": "green",
+      "timed_out": false,
+      "number_of_nodes": 9,
+      "number_of_data_nodes": 3,
+      "active_primary_shards": 5,
+      "active_shards": 10,
+      "relocating_shards": 0,
+      "initializing_shards": 0,
+      "unassigned_shards": 0,
+      "delayed_unassigned_shards": 0,
+      "number_of_pending_tasks": 0,
+      "number_of_in_flight_fetch": 0,
+      "task_max_waiting_in_queue_millis": 0,
+      "active_shards_percent_as_number": 100
+    }
+    ```
+
+    In yet another terminal window, you can run a loop to test the availability
+    of the search API which should continue working during a Master re-election:
+    ```console
+    while true; do \
+        date "+%H:%M:%S,%3N" \
+        curl --max-time 1 'http://localhost:9200/shakespeare/_search?q=happy%20dagger'
+        echo "" \
+        sleep 1 \
+    done
+    ```
+
 *   **Completed Upgrade:** After the upgrade steps have been completed, the
     `validation.sh` script will check the control plane version and each
     node's version.  Execute it from within this directory:
@@ -336,6 +385,8 @@ The cluster creation, upgrade, and validation can be run with one command:
     Control plane is upgraded to 1.10.4-gke.2!
     Validating the Nodes...
     All nodes upgraded to 1.10.4-gke.2!
+    Validating the number of hello-server pods running...
+    All hello-server pods have been running.
     ```
 
 
@@ -348,9 +399,24 @@ this example run the following command:
 ```
 
 ## Troubleshooting
+
+* `E0717 09:45:59.417020    1245 portforward.go:178] lost connection to pod`
+
+  The port-forward command will occasionally fail, especially as the cluster is
+  being manipulated.  Execute the following command to reconnect:
+  ```console
+  kubectl port-forward svc/elasticsearch 9200
+  ```
+
+* `Currently upgrading cluster` Error:
+
+  ```console
+  ERROR: (gcloud.container.node-pools.delete) ResponseError: code=400, message=Operation operation-1529415957904-496c7278 is currently upgrading cluster blue-green-test. Please wait and try again once it is done.
+  ```
+
 * `IN_USE_ADDRESSES` Quota Error:
 
-  ```
+  ```console
   ERROR: (gcloud.container.clusters.create) ResponseError: code=403, message=Insufficient regional quota to satisfy request for resource: "IN_USE_ADDRESSES". The request requires '9.0' and is short '1.0'. The regional quota is '8.0' with '8.0' available.
   ```
 
@@ -363,7 +429,7 @@ this example run the following command:
 
 * `CPUS` Quota Error:
 
-  ```
+  ```console
   ERROR: (gcloud.container.node-pools.create) ResponseError: code=403, message=Insufficient regional quota to satisfy request for resource: "CPUS". The request requires '12.0' and is short '3.0'. The regional quota is '24.0' with '9.0' available.
   ```
   1.  Open the GCP Console and navigate to `IAM & admin` -> `Quotas`.
@@ -374,7 +440,7 @@ this example run the following command:
 
 * `Upgrade` Error after resize:
 
-  ```
+  ```console
   ERROR: (gcloud.container.clusters.upgrade) ResponseError: code=400,
   message=Operation operation-1528990089723-411a9049 is currently upgrading
   cluster expand-contract-cluster. Please wait and try again once it is done.
@@ -388,6 +454,7 @@ this example run the following command:
       step in the demo.
 
 ## Relevant Material
+
 * `PodDisruptionBudgets` - [Kubernetes Disruptions](https://kubernetes.io/docs/concepts/workloads/pods/disruptions/)
 * `readinessProbe` - [Pod lifecycle](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/)
 * [Kubernetes Engine Release Notes](https://cloud.google.com/kubernetes-engine/release-notes)
