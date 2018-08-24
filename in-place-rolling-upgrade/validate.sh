@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# shellcheck source=.env
-
 # validate.sh - a script to validate that an upgrade has completed successfully.
 # It relies on the use of kubectl and jq.
 
@@ -35,7 +33,7 @@ command -v jq >/dev/null || fail "jq is not installed!"
 
 # Source the properties file
 if [ -f "${REPO_HOME}/.env" ] ; then
-  # shellcheck disable=SC1091
+  # shellcheck source=.env
   source "${REPO_HOME}/.env"
 else
   echo "ERROR: Define a properties file '.env'"
@@ -52,7 +50,7 @@ fi
 # 0 - when the control plane version == NEW_GKE_VER
 # 1 - when the control plane version != NEW_GKE_VER
 validate_control() {
-  CONTROL_VER=$(kubectl version -o json | jq -r .serverVersion.gitVersion)
+  CONTROL_VER=$(kubectl -n default version -o json | jq -r .serverVersion.gitVersion)
   # remove the preceeding v
   CONTROL_VER=${CONTROL_VER#v}
   if [[ "$CONTROL_VER" == "$NEW_GKE_VER" ]]; then
@@ -68,10 +66,10 @@ validate_control() {
 # 0 - when all node versions == NEW_GKE_VER
 # 1 - when a node version != NEW_GKE_VER
 validate_nodes() {
-  NODES=$(kubectl get nodes -o name)
+  NODES=$(kubectl -n default get nodes -o name)
   for NODE in ${NODES}; do
     # Find the kubelet version on each node.  This will match the gke version
-    NODE_VER=$(kubectl get "${NODE}" -o json | \
+    NODE_VER=$(kubectl -n default get "${NODE}" -o json | \
       jq -r '.status.nodeInfo.kubeletVersion')
     # remove the preceeding v, i.e. v1.10.4-gke.2 => 1.10.4-gke.2
     NODE_VER=${NODE_VER#v}
@@ -90,9 +88,9 @@ validate_nodes() {
 # 1 - when not all pods running
 validate_pods() {
   # Find the current number of running pods
-  PODS_AVAILABLE=$(kubectl get deployment hello-server \
+  PODS_AVAILABLE=$(kubectl -n default get deployment hello-server \
     -o jsonpath='{.status.availableReplicas}')
-  PODS_REQUEST=$(kubectl get deployments hello-server \
+  PODS_REQUEST=$(kubectl -n default get deployments hello-server \
     -o jsonpath='{.status.replicas}')
   if ! [[ "${PODS_AVAILABLE}" == "${PODS_REQUEST}" ]]; then
     echo -n "ERROR: ${PODS_AVAILABLE} available pods, "

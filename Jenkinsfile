@@ -65,11 +65,7 @@ spec:
   }
 
   environment {
-    CASSANDRA_VERSION = "3.11.3"
-    REV = "v${env.BUILD_NUMBER}"
-    IMAGE_TAG = "${CASSANDRA_VERSION}-${REV}"
-    APP_NAME='cassandra'
-    MANIFEST_FILE='manifests/cassandra-statefulset.yaml'
+    GOOGLE_APPLICATION_CREDENTIALS    = '/home/jenkins/dev/jenkins-deploy-dev-infra.json'
   }
 
   stages {
@@ -85,68 +81,53 @@ spec:
                 // development project id
                 env.PROJECT_ID = "${PROJECT_ID}"
                 env.REGION = "${REGION}"
-                def shortCommit = sh ( returnStdout: true, script: 'git rev-parse HEAD | cut -c 1-6').trim()
-                env.CLUSTER_NAME = "mycsharp-${shortCommit}"
-                //env.CLUSTER_NAME = "${CLUSTER_NAME}"
-                env.KEYFILE = "/home/jenkins/dev/jenkins-deploy-dev-infra.json"
+                env.KEYFILE = GOOGLE_APPLICATION_CREDENTIALS
             }
           // Setup gcloud service account access
           sh "gcloud auth activate-service-account --key-file=${env.KEYFILE}"
           sh "gcloud config set compute/zone ${env.CLUSTER_ZONE}"
           sh "gcloud config set core/project ${env.PROJECT_ID}"
-          sh "gcloud config set container/cluster ${env.CLUSTER_NAME}"
           sh "gcloud config set compute/region ${env.REGION}"
          }
         }
     }
 
-    stage('linter') {
+    stage('configure environment file') {
       steps {
         container('k8s-node') {
-           sh "make all"
+          sh './test/configure-jenkins-environment.sh'
         }
       }
     }
 
-   stage('buildcontainers') {
+    stage('Lint') {
       steps {
         container('k8s-node') {
-           dir ('container') {
-              sh 'gcloud builds submit --config=cloudbuild.yaml --substitutions=_CASSANDRA_VERSION=${CASSANDRA_VERSION},_REV_=${REV} .'
-           }
+           sh "make lint"
         }
       }
     }
 
-    stage('create') {
+   stage('blue-green-upgrade') {
       steps {
         container('k8s-node') {
-           timeout(time: 20, unit: 'MINUTES') {
-             // update the cassandra image tag
-             sh './update_image_tag.sh ${PROJECT_ID} ${APP_NAME} ${IMAGE_TAG} ${MANIFEST_FILE}'
-             sh "make create CLUSTER_NAME=${env.CLUSTER_NAME}"
-             sh "sleep 540"
-          }
+            sh 'make blue-green-upgrade'
         }
       }
     }
 
-    stage('validate') {
+    stage('expand-contract-upgrade') {
       steps {
         container('k8s-node') {
-          script {
-            for (int i = 0; i < 3; i++) {
-               sh "make validate CLUSTER_NAME=${env.CLUSTER_NAME}"
-            }
-          }
+             sh 'make expand-contract-upgrade'
         }
       }
     }
 
-    stage('delete') {
+    stage('in-place-rolling-upgrade') {
       steps {
         container('k8s-node') {
-          sh "make delete CLUSTER_NAME=${env.CLUSTER_NAME}"
+          sh 'make in-place-rolling-upgrade'
         }
       }
     }
@@ -156,6 +137,9 @@ spec:
   post {
     always {
       container('k8s-node') {
+        sh 'make blue-green-upgrade-delete'
+        sh 'make expand-contract-upgrade-delete'
+        sh 'make in-place-rolling-upgrade-delete'
         sh 'gcloud auth revoke'
       }
     }

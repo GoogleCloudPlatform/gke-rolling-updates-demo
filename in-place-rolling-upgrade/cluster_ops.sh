@@ -16,8 +16,6 @@
 # cluster_ops.sh - a runner script to create, upgrade, and delete gke clusters
 # with the help of kubectl, terraform, and gcloud
 
-# shellcheck source=.env
-
 set -euo pipefail
 
 SCRIPT_HOME="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -55,7 +53,7 @@ fi
 
 # Source the configuration file if it exists
 if [ -f "${REPO_HOME}/.env" ] ; then
-  # shellcheck disable=SC1091
+  # shellcheck source=.env
   source "${REPO_HOME}/.env"
 fi
 
@@ -113,13 +111,6 @@ fi
 terraform_apply() {
   CONTROL_PLANE_VERSION=$1
   NODE_POOL_VERSION=$2
-  terraform plan \
-    -var control_plane_version="${CONTROL_PLANE_VERSION}" \
-    -var node_pool_version="${NODE_POOL_VERSION}" \
-    -var machine_type="${MACHINE_TYPE}" \
-    -var num_nodes="${NUM_NODES}" \
-    -var region="${GCLOUD_REGION}" \
-    -var zone="${GCLOUD_ZONE}"
 
   terraform apply -input=false -auto-approve \
     -var control_plane_version="${CONTROL_PLANE_VERSION}" \
@@ -139,6 +130,7 @@ create_cluster() {
   echo "GKE Version = ${GKE_VER}"
 
   # Initialize terraform by downloading the appropriate provider
+  cd "$SCRIPT_HOME"
   terraform init
   terraform_apply "${GKE_VER}" "${GKE_VER}"
 
@@ -148,24 +140,29 @@ create_cluster() {
     --project "${GCLOUD_PROJECT}"
 
   # Deploy the example application
-  kubectl apply -f "${REPO_HOME}/manifests/hello-server.yaml"
-  kubectl apply -f "${REPO_HOME}/manifests/hello-svc.yaml"
+  kubectl -n default apply -f "${REPO_HOME}/manifests/hello-server.yaml"
+  kubectl -n default apply -f "${REPO_HOME}/manifests/hello-svc.yaml"
 }
 
 upgrade_control() {
+  cd "$SCRIPT_HOME"
   terraform_apply "${NEW_GKE_VER}" "${GKE_VER}"
 }
 
 upgrade_nodes() {
+  cd "$SCRIPT_HOME"
   terraform_apply "${NEW_GKE_VER}" "${NEW_GKE_VER}"
 }
 
 downgrade_nodes() {
+  cd "$SCRIPT_HOME"
   terraform_apply "${NEW_GKE_VER}" "${GKE_VER}"
 }
 
 tear_down() {
+  cd "$SCRIPT_HOME"
   terraform destroy \
+    -auto-approve \
     -var control_plane_version="${NEW_GKE_VER}" \
     -var node_pool_version="${GKE_VER}" \
     -var machine_type="${MACHINE_TYPE}" \

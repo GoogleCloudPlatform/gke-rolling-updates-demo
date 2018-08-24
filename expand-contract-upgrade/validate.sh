@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# shellcheck source=.env
-
 # validate.sh - a script to validate that an upgrade has completed successfully.
 # It relies on the use of kubectl and jq.
 
@@ -35,7 +33,7 @@ command -v jq >/dev/null || fail "jq is not installed!"
 
 # Source the properties file
 if [ -f "${REPO_HOME}/.env" ] ; then
-  # shellcheck disable=SC1091
+  # shellcheck source=.env
   source "${REPO_HOME}/.env"
 else
   echo "ERROR: Define a properties file '.env'"
@@ -103,7 +101,7 @@ strip_gke_ver() {
 # 0 - when the control plane version == NEW_K8S_VER
 # 1 - when the control plane version != NEW_K8S_VER
 validate_control() {
-  CONTROL_VER=$(kubectl version -o json | jq -r .serverVersion.gitVersion)
+  CONTROL_VER=$(kubectl -n default version -o json | jq -r .serverVersion.gitVersion)
   VER=$(strip_gke_ver "${CONTROL_VER}")
   if compare_semver "$VER" "$NEW_K8S_VER"; then
     return 0
@@ -118,10 +116,10 @@ validate_control() {
 # 0 - when all node versions == NEW_K8S_VER
 # 1 - when a node version != NEW_K8S_VER
 validate_nodes() {
-  NODES=$(kubectl get nodes -o name)
+  NODES=$(kubectl -n default get nodes -o name)
   for NODE in ${NODES}; do
     # Find the kubelet version on each node.  This will match the gke version
-    NODE_VER=$(kubectl get "${NODE}" -o json | \
+    NODE_VER=$(kubectl -n default get "${NODE}" -o json | \
       jq -r '.status.nodeInfo.kubeletVersion')
     # Strip out the gke patch number to compare with NEW_K8S_VER
     VER=$(strip_gke_ver "${NODE_VER}")
@@ -136,9 +134,9 @@ validate_nodes() {
 
 validate_elasticsearch() {
   # Check the number of master nodes
-  MASTERS_AVAILABLE=$(kubectl get deployment es-master \
+  MASTERS_AVAILABLE=$(kubectl -n default get deployment es-master \
     -o jsonpath='{.status.availableReplicas}')
-  MASTERS_REQUEST=$(kubectl get deployment es-master \
+  MASTERS_REQUEST=$(kubectl -n default get deployment es-master \
     -o jsonpath='{.spec.replicas}')
 
   if ! [[ "${MASTERS_REQUEST}" == "${MASTERS_AVAILABLE}" ]]; then
@@ -150,9 +148,9 @@ validate_elasticsearch() {
   fi
 
   # Check the number of client nodes
-  CLIENTS_AVAILABLE=$(kubectl get deployment es-client \
+  CLIENTS_AVAILABLE=$(kubectl -n default get deployment es-client \
     -o jsonpath='{.status.availableReplicas}')
-  CLIENTS_REQUEST=$(kubectl get deployment es-client \
+  CLIENTS_REQUEST=$(kubectl -n default get deployment es-client \
     -o jsonpath='{.spec.replicas}')
 
   if ! [[ "${CLIENTS_REQUEST}" == "${CLIENTS_AVAILABLE}" ]]; then
@@ -164,9 +162,9 @@ validate_elasticsearch() {
   fi
 
   # Check the number of data nodes
-  DATA_AVAILABLE=$(kubectl get sts es-data \
+  DATA_AVAILABLE=$(kubectl -n default get sts es-data \
     -o jsonpath='{.status.readyReplicas}')
-  DATA_REQUEST=$(kubectl get sts es-data \
+  DATA_REQUEST=$(kubectl -n default get sts es-data \
     -o jsonpath='{.spec.replicas}')
 
   if ! [[ "${DATA_REQUEST}" == "${DATA_AVAILABLE}" ]]; then
@@ -178,7 +176,7 @@ validate_elasticsearch() {
   fi
 
   echo "Setting up port-forward to Elasticsearch Client..."
-  kubectl port-forward svc/elasticsearch 9200:9200 1>&2>/dev/null &
+  kubectl -n default port-forward svc/elasticsearch 9200:9200 1>&2>/dev/null &
   sleep 4
   # Check for Shakespeare search index
   SHAKESPEARE_INDEX=$(curl -o /dev/null -w "%{http_code}" http://localhost:9200/shakespeare 2>/dev/null)

@@ -21,8 +21,8 @@
 export GCLOUD_REGION=
 
 # GCLOUD_PROJECT - A project to which your workstation has access and
-# permission to create resources.  This project will not be created but the
-# cluster_ops.sh script and must already exist.
+# permission to create resources.  This project will not be created but it
+# must already exist.
 export GCLOUD_PROJECT=
 
 # NUM_NODES - In a regional cluster, this is the number of nodes per zone
