@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Copyright 2018 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,10 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# All of the scripts expect to find ".env" in the root folder
 cp env .env
-sed -i "s/export GCLOUD_REGION=/export GCLOUD_REGION=${REGION}/g" .env
-sed -i "s/export GCLOUD_PROJECT=/export GCLOUD_PROJECT=${PROJECT_ID}/g" .env
-sed -i "s/export GCLOUD_ZONE=/export GCLOUD_ZONE=${CLUSTER_ZONE}/g" .env
+# .env is used as a configuration file for the rest of the project.
+# Need to choose some values for the automated tests in Jenkins
 sed -i "s/export K8S_VER=/export K8S_VER=1.9.7/g" .env
 sed -i "s/export NEW_K8S_VER=/export NEW_K8S_VER=1.10.4/g" .env
 sed -i "s/export GKE_VER=/export GKE_VER=1.9.7-gke.6/g" .env
