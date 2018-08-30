@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# shellcheck source=.env
-
 # cluster_ops.sh - a runner script to create, upgrade, and delete gke clusters
 # with the help of kubectl, and gcloud
 
@@ -57,7 +55,7 @@ fi
 
 # Source the properties file
 if [ -f "${REPO_HOME}/.env" ] ; then
-  # shellcheck disable=SC1091
+  # shellcheck source=.env
   source "${REPO_HOME}/.env"
 else
   echo "ERROR: Define a properties file '.env'"
@@ -116,7 +114,7 @@ fi
 
 load_data() {
   echo "Setting up port-forward to Elasticsearch client"
-  kubectl port-forward svc/elasticsearch 9200 1>&2>/dev/null &
+  kubectl -n default port-forward svc/elasticsearch 9200 1>&2>/dev/null &
   # Wait a couple seconds for connection to establish as that last command is
   # not blocking
   sleep 5
@@ -147,20 +145,20 @@ load_data() {
 # Installs the hello appF
 install_app() {
   echo "Installing Elasticsearch Cluster"
-  kubectl create -f "${REPO_HOME}/manifests/es-discovery-svc.yaml"
-  kubectl create -f "${REPO_HOME}/manifests/es-svc.yaml"
-  kubectl create -f "${REPO_HOME}/manifests/es-master-pdb.yaml"
-  kubectl create -f "${REPO_HOME}/manifests/es-master.yaml"
-  kubectl rollout status -f "${REPO_HOME}/manifests/es-master.yaml"
+  kubectl -n default create -f "${REPO_HOME}/manifests/es-discovery-svc.yaml"
+  kubectl -n default create -f "${REPO_HOME}/manifests/es-svc.yaml"
+  kubectl -n default create -f "${REPO_HOME}/manifests/es-master-pdb.yaml"
+  kubectl -n default create -f "${REPO_HOME}/manifests/es-master.yaml"
+  kubectl -n default rollout status -f "${REPO_HOME}/manifests/es-master.yaml"
 
-  kubectl create -f "${REPO_HOME}/manifests/es-client-pdb.yaml"
-  kubectl create -f "${REPO_HOME}/manifests/es-client.yaml"
-  kubectl rollout status -f "${REPO_HOME}/manifests/es-client.yaml"
+  kubectl -n default create -f "${REPO_HOME}/manifests/es-client-pdb.yaml"
+  kubectl -n default create -f "${REPO_HOME}/manifests/es-client.yaml"
+  kubectl -n default rollout status -f "${REPO_HOME}/manifests/es-client.yaml"
 
-  kubectl create -f "${REPO_HOME}/manifests/es-data-svc.yaml"
-  kubectl create -f "${REPO_HOME}/manifests/es-data-pdb.yaml"
-  kubectl create -f "${REPO_HOME}/manifests/es-data-stateful.yaml"
-  kubectl rollout status -f "${REPO_HOME}/manifests/es-data-stateful.yaml"
+  kubectl -n default create -f "${REPO_HOME}/manifests/es-data-svc.yaml"
+  kubectl -n default create -f "${REPO_HOME}/manifests/es-data-pdb.yaml"
+  kubectl -n default create -f "${REPO_HOME}/manifests/es-data-stateful.yaml"
+  kubectl -n default rollout status -f "${REPO_HOME}/manifests/es-data-stateful.yaml"
 
   load_data
 }
@@ -185,7 +183,7 @@ create_cluster() {
     --project "${GCLOUD_PROJECT}"
 
   # Bind the cluster-admin ClusterRole to your user account
-  kubectl create clusterrolebinding cluster-admin-binding \
+  kubectl -n default create clusterrolebinding cluster-admin-binding \
     --clusterrole cluster-admin \
     --user "$(gcloud config get-value account)"
 
@@ -207,7 +205,7 @@ upgrade_control() {
 # node selector.  All nodes with the matching label are drained.
 drain_node_label() {
   LABEL=$1
-  OLD_NODES=$(kubectl get nodes -l "${LABEL}" -o name)
+  OLD_NODES=$(kubectl -n default get nodes -l "${LABEL}" -o name)
   echo "Found nodes to drain:"
   echo "${OLD_NODES}"
   # Check if we are disabling prompts
@@ -222,7 +220,7 @@ drain_node_label() {
   for NODE in ${OLD_NODES}; do
     # remove the 'node/' prefix from the output
     NODE=${NODE%%"node/"}
-    kubectl drain "${NODE}" --ignore-daemonsets --delete-local-data --force
+    kubectl -n default drain "${NODE}" --ignore-daemonsets --delete-local-data --force
   done
 }
 
@@ -230,9 +228,9 @@ drain_node_label() {
 # node selector.  All nodes with the matching label are cordoned.
 cordon_node_label() {
   LABEL=$1
-  OLD_NODES=$(kubectl get nodes -l "${LABEL}" -o name)
+  OLD_NODES=$(kubectl -n default get nodes -l "${LABEL}" -o name)
   for NODE in ${OLD_NODES}; do
-    kubectl cordon "${NODE}"
+    kubectl -n default cordon "${NODE}"
   done
 }
 
@@ -269,10 +267,14 @@ delete_default_pool() {
 
 # Deletes the GKE cluster created by this example
 tear_down() {
+  if gcloud container clusters describe "${CLUSTER_NAME}" \
+    --project "${GCLOUD_PROJECT}" \
+    --region "${GCLOUD_REGION}"; then
   echo "Deleting the GKE cluster ${CLUSTER_NAME}"
-  gcloud container clusters delete "${CLUSTER_NAME}" \
+  gcloud container clusters delete --quiet "${CLUSTER_NAME}" \
     --project "${GCLOUD_PROJECT}" \
     --region "${GCLOUD_REGION}"
+  fi
 }
 
 # After the new node pool is created, the control plane instances get upgraded

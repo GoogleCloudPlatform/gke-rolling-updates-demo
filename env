@@ -16,15 +16,6 @@
 ###############################################################################
 # Used by all 3 examples
 ###############################################################################
-# GCLOUD_REGION - the Google Compute region in which to build the GKE cluster.
-# Available regions can be displayed with `gcloud compute regions list`
-export GCLOUD_REGION=
-
-# GCLOUD_PROJECT - A project to which your workstation has access and
-# permission to create resources.  This project will not be created but the
-# cluster_ops.sh script and must already exist.
-export GCLOUD_PROJECT=
-
 # NUM_NODES - In a regional cluster, this is the number of nodes per zone
 export NUM_NODES=1
 
@@ -60,10 +51,6 @@ export GKE_VER=
 # NEW_GKE_VER - The Kubernetes version to upgrade to
 # Valid Examples: 1.9.7-gke.3, 1.10.2-gke.3, etc
 export NEW_GKE_VER=
-
-# GCLOUD_ZONE - the Google Compute zone to use, needed by the terraform
-# google_container_engine_versions data provider
-export GCLOUD_ZONE=
 
 # Timeouts: Some operations have been observed to take longer thant the defaults
 # Here they can be changed

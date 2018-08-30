@@ -14,8 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# shellcheck source=.env
-
 set -euo pipefail
 
 # "---------------------------------------------------------"
@@ -37,7 +35,7 @@ set -euo pipefail
 ## source properties file
 SCRIPT_HOME="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 REPO_HOME="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
-# shellcheck disable=SC1091
+# shellcheck source=.env
 source "${REPO_HOME}/.env"
 
 if [ -z ${CLUSTER_NAME:+exists} ]; then
@@ -165,7 +163,7 @@ create_cluster() {
 ## Creates the Shakespeare index and loads the data
 load_data() {
   echo "Setting up port-forward to Elasticsearch client"
-  kubectl port-forward svc/elasticsearch 9200 1>&2>/dev/null &
+  kubectl -n default port-forward svc/elasticsearch 9200 1>&2>/dev/null &
   # Wait a couple seconds for connection to establish as that last command is
   # not blocking
   sleep 5
@@ -196,20 +194,20 @@ load_data() {
 ## Installs the Elasticsearch cluster
 setup_app() {
   echo "Installing Elasticsearch Cluster"
-  kubectl create -f "${REPO_HOME}/manifests/es-discovery-svc.yaml"
-  kubectl create -f "${REPO_HOME}/manifests/es-svc.yaml"
-  kubectl create -f "${REPO_HOME}/manifests/es-master-pdb.yaml"
-  kubectl create -f "${REPO_HOME}/manifests/es-master.yaml"
-  kubectl rollout status -f "${REPO_HOME}/manifests/es-master.yaml"
+  kubectl -n default create -f "${REPO_HOME}/manifests/es-discovery-svc.yaml"
+  kubectl -n default create -f "${REPO_HOME}/manifests/es-svc.yaml"
+  kubectl -n default create -f "${REPO_HOME}/manifests/es-master-pdb.yaml"
+  kubectl -n default create -f "${REPO_HOME}/manifests/es-master.yaml"
+  kubectl -n default rollout status -f "${REPO_HOME}/manifests/es-master.yaml"
 
-  kubectl create -f "${REPO_HOME}/manifests/es-client-pdb.yaml"
-  kubectl create -f "${REPO_HOME}/manifests/es-client.yaml"
-  kubectl rollout status -f "${REPO_HOME}/manifests/es-client.yaml"
+  kubectl -n default create -f "${REPO_HOME}/manifests/es-client-pdb.yaml"
+  kubectl -n default create -f "${REPO_HOME}/manifests/es-client.yaml"
+  kubectl -n default rollout status -f "${REPO_HOME}/manifests/es-client.yaml"
 
-  kubectl create -f "${REPO_HOME}/manifests/es-data-svc.yaml"
-  kubectl create -f "${REPO_HOME}/manifests/es-data-pdb.yaml"
-  kubectl create -f "${REPO_HOME}/manifests/es-data-stateful.yaml"
-  kubectl rollout status -f "${REPO_HOME}/manifests/es-data-stateful.yaml"
+  kubectl -n default create -f "${REPO_HOME}/manifests/es-data-svc.yaml"
+  kubectl -n default create -f "${REPO_HOME}/manifests/es-data-pdb.yaml"
+  kubectl -n default create -f "${REPO_HOME}/manifests/es-data-stateful.yaml"
+  kubectl -n default rollout status -f "${REPO_HOME}/manifests/es-data-stateful.yaml"
 
   load_data
 }
@@ -262,22 +260,19 @@ tear_down() {
   echo ""
   echo "Tearing down the infrastructure ....."
   echo ""
-  delete_manifests
   delete_cluster
-}
-
-
-# delete es manifests
-delete_manifests() {
-  kubectl delete --ignore-not-found=true -f "${REPO_HOME}/manifests"
 }
 
 # delete cluster
 delete_cluster() {
+  if gcloud container clusters describe "${CLUSTER_NAME}" \
+    --project "${GCLOUD_PROJECT}" \
+    --region "${GCLOUD_REGION}"; then
   gcloud container clusters delete $"${CLUSTER_NAME}" \
     --project "${GCLOUD_PROJECT}" \
     --region "${GCLOUD_REGION}" \
     --quiet
+  fi
 }
 
 # After the node pool is expanded, the control plane instances will likely be

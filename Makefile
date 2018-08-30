@@ -16,11 +16,35 @@
 SHELL := /usr/bin/env bash
 
 # All is the first target in the file so it will get picked up when you just run 'make' on its own
-all: check_shell check_python check_golang check_terraform check_docker check_base_files check_headers check_trailing_whitespace
+lint: check_shell check_python check_golang check_terraform check_docker check_base_files check_headers check_trailing_whitespace
 
 # The .PHONY directive tells make that this isn't a real target and so
 # the presence of a file named 'check_shell' won't cause this target to stop
 # working
+.PHONY: blue-green-upgrade
+blue-green-upgrade:
+	@source blue-green-upgrade/cluster_ops.sh auto
+
+.PHONY: blue-green-upgrade-delete
+blue-green-upgrade-delete:
+	@source blue-green-upgrade/cluster_ops.sh delete
+
+.PHONY: expand-contract-upgrade
+expand-contract-upgrade:
+	@source expand-contract-upgrade/cluster_ops.sh auto
+
+.PHONY: expand-contract-upgrade-delete
+expand-contract-upgrade-delete:
+	@source expand-contract-upgrade/cluster_ops.sh delete
+
+.PHONY: in-place-rolling-upgrade
+in-place-rolling-upgrade:
+	@source in-place-rolling-upgrade/cluster_ops.sh auto
+
+.PHONY: in-place-rolling-upgrade-delete
+in-place-rolling-upgrade-delete:
+	@source in-place-rolling-upgrade/cluster_ops.sh delete
+
 .PHONY: check_shell
 check_shell:
 	@source test/make.sh && check_shell
