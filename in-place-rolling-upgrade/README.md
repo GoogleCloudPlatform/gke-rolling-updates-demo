@@ -5,6 +5,8 @@
 * [Introduction](#introduction)
 * [Architecture](#architecture)
 * [Prerequisites](#prerequisites)
+   * [Run Demo in a Google Cloud Shell](#run-demo-in-a-google-cloud-shell)
+   * [Supported Operating Systems](#supported-operating-systems)
    * [Tools](#tools)
    * [Configuration](#configuration)
        * [.env Properties](#env-properties)
@@ -58,10 +60,32 @@ interest with the following command:
 ```console
 gcloud container get-server-config [--zone <zone-name>] [--region <region-name>]
 ```
-
 ## Prerequisites
 
+A Google Cloud account and project is required for this.  Access to an existing Google Cloud
+project with the Kubernetes Engine service enabled If you do not have a Google Cloud account
+please signup for a free trial [here](https://cloud.google.com).
+
+### Run Demo in a Google Cloud Shell
+
+Click the button below to run the demo in a [Google Cloud Shell](https://cloud.google.com/shell/docs/).
+
+[![Open in Cloud Shell](http://gstatic.com/cloudssh/images/open-btn.svg)](https://console.cloud.google.com/cloudshell/open?git_repo=https%3A%2F%2Fgithub.com%2FGoogleCloudPlatform%2Fgke-rolling-updates-demo&page=editor&tutorial=in-place-rolling-upgrade%2FREADME.md&image=gcr.io/graphite-cloud-shell-images/terraform)
+
+All the tools for the demo are installed. When using Cloud Shell execute the following
+command in order to setup gcloud cli.
+
+```console
+gcloud init
+```
+
+### Supported Operating Systems
+
+This project will run on macOS, Linux, or in a [Google Cloud Shell](https://cloud.google.com/shell/docs/).
+
 ### Tools
+
+The following tools are required. When using Cloud Shell the tools are already installed.
 
 1. [gcloud](https://cloud.google.com/sdk/downloads) (Google Cloud SDK version >= 200.0.0)
 1. [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/) >= 1.10.0
