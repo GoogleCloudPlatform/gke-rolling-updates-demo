@@ -17,7 +17,15 @@
 cp env .env
 # .env is used as a configuration file for the rest of the project.
 # Need to choose some values for the automated tests in Jenkins
-sed -i "s/export K8S_VER=/export K8S_VER=1.9.7/g" .env
-sed -i "s/export NEW_K8S_VER=/export NEW_K8S_VER=1.10.4/g" .env
-sed -i "s/export GKE_VER=/export GKE_VER=1.9.7-gke.6/g" .env
-sed -i "s/export NEW_GKE_VER=/export NEW_GKE_VER=1.10.2-gke.4/g" .env
+GCLOUD_REGION=us-west2
+
+toVersion=$(gcloud container get-server-config --zone "${GCLOUD_REGION}" 2>/dev/null | grep -A 1 validMasterVersions | tail -1 | sed 's/- //')
+fromVersion=$(gcloud container get-server-config --zone "${GCLOUD_REGION}" 2>/dev/null | grep -B 1 validNodeVersions | head -1 | sed 's/- //')
+toVersionShortName=$(echo "$toVersion" | cut -f1 -d'-')
+fromVersionShortName=$(echo "$fromVersion" | cut -f1 -d'-')
+
+sed -i "s/export K8S_VER=/export K8S_VER=${fromVersionShortName}/g" .env
+sed -i "s/export NEW_K8S_VER=/export NEW_K8S_VER=${toVersionShortName}/g" .env
+sed -i "s/export GKE_VER=/export GKE_VER=${fromVersion}/g" .env
+sed -i "s/export NEW_GKE_VER=/export NEW_GKE_VER=${toVersion}/g" .env
+
