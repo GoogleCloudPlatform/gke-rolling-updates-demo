@@ -36,6 +36,20 @@ spec:
         component: elasticsearch
         role: data
     spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: component
+                operator: In
+                values:
+                - elasticsearch
+              - key: role
+                operator: In
+                values:
+                - data
+            topologyKey: kubernetes.io/hostname
       initContainers:
       # see https://www.elastic.co/guide/en/elasticsearch/reference/current/vm-max-map-count.html
       # and https://www.elastic.co/guide/en/elasticsearch/reference/current/setup-configuration-memory.html#mlockall
