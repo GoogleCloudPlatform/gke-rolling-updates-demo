@@ -263,6 +263,8 @@ delete_default_pool() {
     --project "${GCLOUD_PROJECT}" \
     --cluster "${CLUSTER_NAME}" \
     --region "${GCLOUD_REGION}"
+# Wait until node-pool goes away
+sleep 10
 }
 
 # Deletes the GKE cluster created by this example
