@@ -31,12 +31,12 @@ export MACHINE_TYPE=n1-standard-4
 # Used by expand-contract-upgrade and blue-green-upgrade
 ###############################################################################
 # K8S_VER - The Kubernetes version to build the initial cluster
-# Valid formats: 1.8, 1.8.8, 1.9, etc, though check for specific available
+# Valid formats: 1.9, 1.9.7, 1.10, etc, though check for specific available
 # versions in your region of choice
 export K8S_VER=
 
 # NEW_K8S_VER - The Kubernetes version to upgrade to
-# Valid formats: 1.9, 1.9.7, 1.10.4, etc, though check for specific available
+# Valid formats: 1.10, 1.10.9, 1.11.2, etc, though check for specific available
 # versions in your region of choice
 export NEW_K8S_VER=
 
@@ -45,11 +45,11 @@ export NEW_K8S_VER=
 # Used by in-place-rolling-upgrade
 ###############################################################################
 # GKE_VER - The Kubernetes version to build the initial cluster
-# Valid Examples: 1.9.6-gke.1, 1.9.7-gke.3, etc
+# Valid Examples: 1.9.7-gke.6, 1.10.6-gke.6, etc
 export GKE_VER=
 
 # NEW_GKE_VER - The Kubernetes version to upgrade to
-# Valid Examples: 1.9.7-gke.3, 1.10.2-gke.3, etc
+# Valid Examples: 1.10.6-gke.6, 1.11.2-gke.9, etc
 export NEW_GKE_VER=
 
 # Timeouts: Some operations have been observed to take longer thant the defaults
