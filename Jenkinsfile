@@ -68,32 +68,30 @@ spec:
           sh "gcloud config set compute/region ${env.REGION}"
          }
     }
-    stage('Lint') {
-        container(containerName) {
-          sh "make lint"
-      }
-    }
     stage('configure environment file') {
         container('k8s-node') {
           sh './test/configure-jenkins-environment.sh'
         }
     }
-
-    stage('blue-green-upgrade') {
-        container('k8s-node') {
-            sh 'make blue-green-upgrade'
-        }
+    // lint relies on .env which will be generate from the `configure environment file` step
+    stage('Lint') {
+        container(containerName) {
+          sh "make lint"
+      }
     }
-
     stage('expand-contract-upgrade') {
         container('k8s-node') {
              sh 'make expand-contract-upgrade'
         }
     }
-
     stage('in-place-rolling-upgrade') {
         container('k8s-node') {
           sh 'make in-place-rolling-upgrade'
+        }
+    }
+    stage('blue-green-upgrade') {
+        container('k8s-node') {
+            sh 'make blue-green-upgrade'
         }
     }
 
@@ -108,9 +106,9 @@ spec:
    finally {
      stage('Teardown') {
       container(containerName) {
-        sh 'make blue-green-upgrade-delete'
         sh 'make expand-contract-upgrade-delete'
         sh 'make in-place-rolling-upgrade-delete'
+        sh 'make blue-green-upgrade-delete'
         sh 'gcloud auth revoke'
       }
      }
