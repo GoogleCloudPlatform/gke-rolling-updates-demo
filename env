@@ -55,10 +55,10 @@ export NEW_GKE_VER=
 # Timeouts: Some operations have been observed to take longer thant the defaults
 # Here they can be changed
 # timeouts {
-#    create = "30m" // default 30m
-#    update = "15m" // default 10m
-#    delete = "15m" // default 10m
+#    create = "40m" // default 30m
+#    update = "25m" // default 10m
+#    delete = "25m" // default 10m
 #  }
-export TIMEOUT_CREATE="30m"
-export TIMEOUT_UPDATE="15m"
-export TIMEOUT_DELETE="15m"
+export TIMEOUT_CREATE="40m"
+export TIMEOUT_UPDATE="25m"
+export TIMEOUT_DELETE="25m"
