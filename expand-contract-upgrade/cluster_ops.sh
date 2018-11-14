@@ -301,6 +301,7 @@ auto() {
   resize_node_pool 2
   # Unfortunate race condition here, a little sleep should be enough
   sleep 10
+  wait_for_upgrade
   upgrade_control
   wait_for_upgrade
   upgrade_nodes
