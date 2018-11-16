@@ -59,6 +59,6 @@ export NEW_GKE_VER=
 #    update = "25m" // default 10m
 #    delete = "25m" // default 10m
 #  }
-export TIMEOUT_CREATE="40m"
-export TIMEOUT_UPDATE="25m"
-export TIMEOUT_DELETE="25m"
+export TIMEOUT_CREATE="45m"
+export TIMEOUT_UPDATE="30m
+export TIMEOUT_DELETE="30m"
