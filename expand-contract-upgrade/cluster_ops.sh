@@ -303,6 +303,7 @@ auto() {
   sleep 10
   wait_for_upgrade
   upgrade_control
+  wait_for_upgrade
   upgrade_nodes
   resize_node_pool 1
   "${SCRIPT_HOME}/validate.sh"

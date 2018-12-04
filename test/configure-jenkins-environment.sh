@@ -20,7 +20,7 @@ cp env .env
 GCLOUD_REGION=us-west2
 
 toVersion=$(gcloud container get-server-config --zone "${GCLOUD_REGION}" 2>/dev/null | grep -A 1 validMasterVersions | tail -1 | sed 's/- //')
-fromVersion=$(gcloud container get-server-config --zone "${GCLOUD_REGION}" 2>/dev/null | grep -B 1 validNodeVersions | head -1 | sed 's/- //')
+fromVersion=$(gcloud container get-server-config --zone "${GCLOUD_REGION}" 2>/dev/null | grep -A 2 validMasterVersions | tail -1 | sed 's/- //')
 toVersionShortName=$(echo "$toVersion" | cut -f1 -d'-')
 fromVersionShortName=$(echo "$fromVersion" | cut -f1 -d'-')
 
