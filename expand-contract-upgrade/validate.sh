@@ -160,7 +160,8 @@ validate_elasticsearch() {
   else
     echo "Found ${CLIENTS_AVAILABLE} client nodes."
   fi
-
+  # give time for data nodes
+  sleep 60
   # Check the number of data nodes
   DATA_AVAILABLE=$(kubectl -n default get sts es-data \
     -o jsonpath='{.status.readyReplicas}')
