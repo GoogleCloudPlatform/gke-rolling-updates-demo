@@ -226,7 +226,9 @@ uninstall_app() {
   # Deleting and/or scaling a StatefulSet down will not delete the volumes associated with the StatefulSet.
   # This is done to ensure data safety, which is generally more valuable
   # than an automatic purge of all related StatefulSet resources.
+  echo "Delete PVCs..."
   kubectl -n default delete pvc -l component=elasticsearch,role=data || true
+  echo "Delete PVs..."
   kubectl delete pv $(kubectl get pv --all-namespaces | grep es-data | awk '{ print $1}')
   echo "kubectl get pvc --all-namespaces"
   kubectl -n default get pvc --all-namespaces
