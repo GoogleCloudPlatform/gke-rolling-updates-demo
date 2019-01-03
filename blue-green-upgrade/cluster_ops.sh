@@ -263,6 +263,8 @@ delete_default_pool() {
     --project "${GCLOUD_PROJECT}" \
     --cluster "${CLUSTER_NAME}" \
     --region "${GCLOUD_REGION}"
+# Wait until node-pool goes away
+sleep 10
 }
 
 # Deletes the GKE cluster created by this example
@@ -271,6 +273,15 @@ tear_down() {
     --project "${GCLOUD_PROJECT}" \
     --region "${GCLOUD_REGION}"; then
   echo "Deleting the GKE cluster ${CLUSTER_NAME}"
+
+  # Cluster might be still upgrading. Wait up to 5 mins and then delete it
+  COUNTER=0
+  until [ $(gcloud container clusters list --filter="STATUS:RUNNING AND NAME:$CLUSTER_NAME" | wc -l) -ne 0 -o $COUNTER -ge 5 ]; do
+    echo Waiting for cluster upgrade to finish...
+    sleep 60
+    COUNTER=$[$COUNTER+1]
+  done
+
   gcloud container clusters delete --quiet "${CLUSTER_NAME}" \
     --project "${GCLOUD_PROJECT}" \
     --region "${GCLOUD_REGION}"

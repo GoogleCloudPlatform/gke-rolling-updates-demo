@@ -212,6 +212,27 @@ setup_app() {
   load_data
 }
 
+# uninstall app
+uninstall_app() {
+  echo "Uninstalling Elasticsearch Cluster"
+  kubectl -n default delete -f "${REPO_HOME}"/manifests/ || true
+
+  # You have to wait the default pod grace period before you can delete the pvcs
+  GRACE=$(kubectl --namespace default get sts -l component=elasticsearch,role=data -o jsonpath='{..terminationGracePeriodSeconds}')
+  PADDING=30
+  echo "Sleeping $(( GRACE + PADDING )) seconds before deleting PVCs. The default pod grace period."
+  sleep "$(( GRACE + PADDING ))"
+
+  # Deleting and/or scaling a StatefulSet down will not delete the volumes associated with the StatefulSet.
+  # This is done to ensure data safety, which is generally more valuable
+  # than an automatic purge of all related StatefulSet resources.
+  kubectl -n default delete pvc -l component=elasticsearch,role=data || true
+  kubectl delete pv $(kubectl get pv --all-namespaces | grep es-data | awk '{ print $1}')
+  echo "kubectl get pvc --all-namespaces"
+  kubectl -n default get pvc --all-namespaces
+  echo "kubectl get pv --all-namespaces"
+  kubectl -n default get pv --all-namespaces
+}
 
 
 ## increase size of the node pool
@@ -260,6 +281,7 @@ tear_down() {
   echo ""
   echo "Tearing down the infrastructure ....."
   echo ""
+  uninstall_app
   delete_cluster
 }
 
@@ -268,6 +290,15 @@ delete_cluster() {
   if gcloud container clusters describe "${CLUSTER_NAME}" \
     --project "${GCLOUD_PROJECT}" \
     --region "${GCLOUD_REGION}"; then
+
+  # Cluster might be still upgrading. Wait up to 5 mins and then delete it
+  COUNTER=0
+  until [ $(gcloud container clusters list --filter="STATUS:RUNNING AND NAME:$CLUSTER_NAME" | wc -l) -ne 0 -o $COUNTER -ge 5 ]; do
+    echo Waiting for cluster upgrade to finish...
+    sleep 60
+    COUNTER=$[$COUNTER+1]
+  done
+
   gcloud container clusters delete $"${CLUSTER_NAME}" \
     --project "${GCLOUD_PROJECT}" \
     --region "${GCLOUD_REGION}" \
@@ -303,6 +334,7 @@ auto() {
   sleep 10
   wait_for_upgrade
   upgrade_control
+  wait_for_upgrade
   upgrade_nodes
   resize_node_pool 1
   "${SCRIPT_HOME}/validate.sh"
