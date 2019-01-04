@@ -30,7 +30,6 @@ demos of each.
       * [<a href="./blue-green-upgrade">Blue/Green Upgrade</a> Example](#bluegreen-upgrade-example)
   * [Downgrades](#downgrades)
   * [Kubernetes Engine and Change Control](#kubernetes-engine-and-change-control)
-  * [Troubleshooting](#troubleshooting)
   * [Relevant Material](#relevant-material)
 <!--te-->
 
@@ -237,19 +236,6 @@ the type of upgrade.  The following decision tree illustrates a high-level
 overview of a manual upgrade of a Kubernetes Engine cluster.
 
 ![manual-upgrade](images/manual-upgrade.png)
-
-## Troubleshooting
-
-If Running into an error while executing `make` commands similar to the below example output
-```console
-Waiting for rollout to finish: 1 of 3 updated replicas are available...
-error: deployment "es-master" exceeded its progress deadline
-```
-The solution would be to double check if the region is set correctly and not zone.
-Run this command to set the region by replacing REGION_NAME with desired region.
-```console
-gcloud config set compute/region <REGION_NAME>
-```
 
 ## Relevant Material
 
