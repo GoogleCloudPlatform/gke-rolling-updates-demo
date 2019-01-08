@@ -230,6 +230,7 @@ cordon_node_label() {
   LABEL=$1
   OLD_NODES=$(kubectl -n default get nodes -l "${LABEL}" -o name)
   for NODE in ${OLD_NODES}; do
+    echo Cordoning ${NODE}...
     kubectl -n default cordon "${NODE}"
   done
 }
@@ -272,8 +273,11 @@ tear_down() {
   if gcloud container clusters describe "${CLUSTER_NAME}" \
     --project "${GCLOUD_PROJECT}" \
     --region "${GCLOUD_REGION}"; then
-  echo "Deleting the GKE cluster ${CLUSTER_NAME}"
+  echo Delete PVCs and PVs...
+  kubectl -n default delete pvc -l component=elasticsearch,role=data || true
+  kubectl delete pv $(kubectl get pv --all-namespaces | grep es-data | awk '{ print $1}')
 
+  echo "Deleting the GKE cluster ${CLUSTER_NAME}"
   # Cluster might be still upgrading. Wait up to 5 mins and then delete it
   COUNTER=0
   until [ $(gcloud container clusters list --filter="STATUS:RUNNING AND NAME:$CLUSTER_NAME" | wc -l) -ne 0 -o $COUNTER -ge 5 ]; do
