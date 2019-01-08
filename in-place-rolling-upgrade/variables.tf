@@ -48,10 +48,10 @@ variable "timeout_create" {
 
 variable "timeout_update" {
   description = "Timeout to update a test cluster"
-  default     = "15m"
+  default     = "25m"
 }
 
 variable "timeout_delete" {
   description = "Timeout to delete a test cluster and sampple app"
-  default     = "15m"
+  default     = "25m"
 }

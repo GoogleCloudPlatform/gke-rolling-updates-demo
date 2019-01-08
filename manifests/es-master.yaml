@@ -40,6 +40,20 @@ spec:
     spec:
       # see https://www.elastic.co/guide/en/elasticsearch/reference/current/vm-max-map-count.html
       # and https://www.elastic.co/guide/en/elasticsearch/reference/current/setup-configuration-memory.html#mlockall
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: component
+                operator: In
+                values:
+                - elasticsearch
+              - key: role
+                operator: In
+                values:
+                - master
+            topologyKey: kubernetes.io/hostname
       initContainers:
       - name: init-sysctl
         image: busybox:1.27.2
