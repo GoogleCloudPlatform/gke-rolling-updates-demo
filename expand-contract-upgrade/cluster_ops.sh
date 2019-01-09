@@ -218,10 +218,10 @@ uninstall_app() {
 #  kubectl -n default delete -f "${REPO_HOME}"/manifests/ || true
 
   # You have to wait the default pod grace period before you can delete the pvcs
-  GRACE=$(kubectl --namespace default get sts -l component=elasticsearch,role=data -o jsonpath='{..terminationGracePeriodSeconds}')
-  PADDING=30
-  echo "Sleeping $(( GRACE + PADDING )) seconds before deleting PVCs. The default pod grace period."
-  sleep "$(( GRACE + PADDING ))"
+#  GRACE=$(kubectl --namespace default get sts -l component=elasticsearch,role=data -o jsonpath='{..terminationGracePeriodSeconds}')
+#  PADDING=30
+#  echo "Sleeping $(( GRACE + PADDING )) seconds before deleting PVCs. The default pod grace period."
+#  sleep "$(( GRACE + PADDING ))"
 
   # Deleting and/or scaling a StatefulSet down will not delete the volumes associated with the StatefulSet.
   # This is done to ensure data safety, which is generally more valuable
