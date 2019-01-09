@@ -253,6 +253,7 @@ new_node_pool() {
     --node-labels="nodepool=${NEW_K8S_VER}"
 
   echo "Cordoning nodes in old node pool"
+  echo Old: ${K8S_VER}      New: ${NEW_K8S_VER}  
   cordon_node_label "nodepool=${K8S_VER}"
 }
 
