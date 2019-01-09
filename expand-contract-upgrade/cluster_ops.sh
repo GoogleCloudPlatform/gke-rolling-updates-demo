@@ -215,7 +215,7 @@ setup_app() {
 # uninstall app
 uninstall_app() {
   echo "Uninstalling Elasticsearch Cluster"
-  kubectl -n default delete -f "${REPO_HOME}"/manifests/ || true
+#  kubectl -n default delete -f "${REPO_HOME}"/manifests/ || true
 
   # You have to wait the default pod grace period before you can delete the pvcs
   GRACE=$(kubectl --namespace default get sts -l component=elasticsearch,role=data -o jsonpath='{..terminationGracePeriodSeconds}')
