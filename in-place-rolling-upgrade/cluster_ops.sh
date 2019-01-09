@@ -161,6 +161,7 @@ downgrade_nodes() {
 
 tear_down() {
   cd "$SCRIPT_HOME"
+  terraform init
   terraform destroy \
     -auto-approve \
     -var control_plane_version="${NEW_GKE_VER}" \
