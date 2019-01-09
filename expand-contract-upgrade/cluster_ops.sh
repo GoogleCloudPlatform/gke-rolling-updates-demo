@@ -232,7 +232,7 @@ uninstall_app() {
   echo "Delete PVCs..."
   kubectl -n default delete pvc -l component=elasticsearch,role=data || true
   echo "Delete PVs..."
-  kubectl delete pv $(kubectl get pv --all-namespaces | grep es-data | awk '{ print $1}')
+  # kubectl delete pv $(kubectl get pv --all-namespaces | grep es-data | awk '{ print $1}')
   echo "kubectl get pvc --all-namespaces"
   kubectl -n default get pvc --all-namespaces
   echo "kubectl get pv --all-namespaces"
