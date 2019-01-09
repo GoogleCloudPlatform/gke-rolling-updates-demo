@@ -274,7 +274,7 @@ tear_down() {
     --project "${GCLOUD_PROJECT}" \
     --region "${GCLOUD_REGION}"; then
   echo "Deleting the GKE cluster ${CLUSTER_NAME}"
-
+  gcloud container clusters list --filter="STATUS:RUNNING AND NAME:$CLUSTER_NAME"
   # Cluster might be still upgrading. Wait up to 5 mins and then delete it
   COUNTER=0
   until [ $(gcloud container clusters list --filter="STATUS:RUNNING AND NAME:$CLUSTER_NAME" | wc -l) -ne 0 -o $COUNTER -ge 5 ]; do
