@@ -174,7 +174,7 @@ create_cluster() {
     --region "${GCLOUD_REGION}" \
     --cluster-version "${K8S_VER}" \
     --machine-type "${MACHINE_TYPE}" \
-    --node-labels "nodepool=${K8S_VER}" \
+    --node-labels "nodepool=${GKE_VER}" \
     --num-nodes "${NUM_NODES}"
 
   # Acquire the kubectl credentials
@@ -250,11 +250,11 @@ new_node_pool() {
     --region "${GCLOUD_REGION}" \
     --num-nodes "${NUM_NODES}" \
     --machine-type "${MACHINE_TYPE}" \
-    --node-labels="nodepool=${NEW_K8S_VER}"
+    --node-labels="nodepool=${NEW_GKE_VER}"
 
   echo "Cordoning nodes in old node pool"
   echo Old: ${K8S_VER}-----New: ${NEW_K8S_VER}
-  cordon_node_label "nodepool=${K8S_VER}"
+  cordon_node_label "nodepool=${GKE_VER}"
 }
 
 # Delete the node pool named "default-pool".
@@ -313,7 +313,7 @@ auto() {
   create_cluster
   upgrade_control
   new_node_pool
-  drain_node_label "nodepool=${K8S_VER}"
+  drain_node_label "nodepool=${GKE_VER}"
   wait_for_upgrade
   delete_default_pool
   "${SCRIPT_HOME}/validate.sh"
@@ -343,10 +343,10 @@ case "${ACTION}" in
     new_node_pool
     ;;
   cordon-default-pool)
-    cordon_node_label "nodepool=${K8S_VER}"
+    cordon_node_label "nodepool=${GKE_VER}"
     ;;
   drain-default-pool)
-    drain_node_label "nodepool=${K8S_VER}"
+    drain_node_label "nodepool=${GKE_VER}"
     ;;
   delete-default-pool)
     delete_default_pool

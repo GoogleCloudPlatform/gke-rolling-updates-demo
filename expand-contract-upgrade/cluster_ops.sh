@@ -214,9 +214,11 @@ setup_app() {
 
 # uninstall app
 uninstall_app() {
- gcloud container clusters get-credentials "${CLUSTER_NAME}" \
+  # Get the Credentials again just in case cluster is left over from previous run and cred is not pulled yet
+  gcloud container clusters get-credentials "${CLUSTER_NAME}" \
     --region "${GCLOUD_REGION}" \
     --project "${GCLOUD_PROJECT}"
+
   echo "Uninstalling Elasticsearch Cluster"
   kubectl -n default delete -f "${REPO_HOME}"/manifests/ || true
 
@@ -237,7 +239,6 @@ uninstall_app() {
   kubectl -n default get pvc --all-namespaces
   echo "kubectl get pv --all-namespaces"
   kubectl -n default get pv --all-namespaces
-  echo "Debug message"
 }
 
 
@@ -293,21 +294,17 @@ tear_down() {
 
 # delete cluster
 delete_cluster() {
-echo "Delete Cluster"
   if gcloud container clusters describe "${CLUSTER_NAME}" \
     --project "${GCLOUD_PROJECT}" \
     --region "${GCLOUD_REGION}"; then
-echo "here 1"
-gcloud container clusters list --filter="STATUS:RUNNING AND NAME:$CLUSTER_NAME"
+
   # Cluster might be still upgrading. Wait up to 5 mins and then delete it
-echo "here 2"
   COUNTER=0
   until [ $(gcloud container clusters list --filter="STATUS:RUNNING AND NAME:$CLUSTER_NAME" | wc -l) -ne 0 -o $COUNTER -ge 5 ]; do
     echo Waiting for cluster upgrade to finish...
     sleep 60
     COUNTER=$[$COUNTER+1]
   done
-echo "here 3"
   gcloud container clusters delete $"${CLUSTER_NAME}" \
     --project "${GCLOUD_PROJECT}" \
     --region "${GCLOUD_REGION}" \
