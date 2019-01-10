@@ -131,10 +131,10 @@ load_data() {
 
   # Here we load the actual data.
   echo "Loading Shakespeare sample data into Elasticsearch"
-  curl -H "Content-Type: application/x-ndjson" \
-    -X POST \
-    --data-binary @"${REPO_HOME}/data/shakespeare.json" \
-    'http://localhost:9200/shakespeare/doc/_bulk?pretty' > /dev/null
+  curl -s -H "Content-Type: application/x-ndjson" \
+    -XPOST \
+    'http://localhost:9200/shakespeare/doc/_bulk?pretty' \
+    --data-binary @"${REPO_HOME}/data/shakespeare.json" > /dev/null
 
   # If we've made it this far the data is loaded
   echo "Sample data successfully loaded!"
