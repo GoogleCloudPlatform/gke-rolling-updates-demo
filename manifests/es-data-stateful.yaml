@@ -26,6 +26,8 @@ spec:
     matchLabels:
       component: elasticsearch
       role: data
+  updateStrategy:
+    type: RollingUpdate
   serviceName: elasticsearch-data
   replicas: 3
   template:
