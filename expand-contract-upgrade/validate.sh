@@ -133,6 +133,9 @@ validate_nodes() {
 }
 
 validate_elasticsearch() {
+  # give time for master/client/data nodes
+  sleep 60
+  
   # Check the number of master nodes
   MASTERS_AVAILABLE=$(kubectl -n default get deployment es-master \
     -o jsonpath='{.status.availableReplicas}')
@@ -154,14 +157,13 @@ validate_elasticsearch() {
     -o jsonpath='{.spec.replicas}')
 
   if ! [[ "${CLIENTS_REQUEST}" == "${CLIENTS_AVAILABLE}" ]]; then
-    echo -n "ERROR: ${CLIENTS_AVAILABLE} master nodes available, but should be "
+    echo -n "ERROR: ${CLIENTS_AVAILABLE} client nodes available, but should be "
     echo "${MASTERS_REQUEST}"
     return 1
   else
     echo "Found ${CLIENTS_AVAILABLE} client nodes."
   fi
-  # give time for data nodes
-  sleep 60
+  
   # Check the number of data nodes
   DATA_AVAILABLE=$(kubectl -n default get sts es-data \
     -o jsonpath='{.status.readyReplicas}')
@@ -169,7 +171,7 @@ validate_elasticsearch() {
     -o jsonpath='{.spec.replicas}')
 
   if ! [[ "${DATA_REQUEST}" == "${DATA_AVAILABLE}" ]]; then
-    echo -n "ERROR: ${DATA_AVAILABLE} master nodes available, but should be "
+    echo -n "ERROR: ${DATA_AVAILABLE} data nodes available, but should be "
     echo "${DATA_REQUEST}"
     return 1
   else
