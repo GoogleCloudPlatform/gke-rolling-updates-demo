@@ -24,6 +24,11 @@ fromVersion=$(gcloud container get-server-config --zone "${GCLOUD_REGION}" 2>/de
 toVersionShortName=$(echo "$toVersion" | cut -f1 -d'-')
 fromVersionShortName=$(echo "$fromVersion" | cut -f1 -d'-')
 
+toVersion="1.11.5-gke.5"
+fromVersion="1.10.12-gke.1"
+toVersionShortName="1.11.5"
+fromVersionShortName="1.10.12"
+
 sed -i "s/export K8S_VER=/export K8S_VER=${fromVersionShortName}/g" .env
 sed -i "s/export NEW_K8S_VER=/export NEW_K8S_VER=${toVersionShortName}/g" .env
 sed -i "s/export GKE_VER=/export GKE_VER=${fromVersion}/g" .env
