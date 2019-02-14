@@ -135,7 +135,7 @@ validate_nodes() {
 validate_elasticsearch() {
   # give time for master/client/data nodes
   sleep 60
-  
+
   # Check the number of master nodes
   MASTERS_AVAILABLE=$(kubectl -n default get deployment es-master \
     -o jsonpath='{.status.availableReplicas}')
@@ -163,7 +163,7 @@ validate_elasticsearch() {
   else
     echo "Found ${CLIENTS_AVAILABLE} client nodes."
   fi
-  
+
   # Check the number of data nodes
   DATA_AVAILABLE=$(kubectl -n default get sts es-data \
     -o jsonpath='{.status.readyReplicas}')

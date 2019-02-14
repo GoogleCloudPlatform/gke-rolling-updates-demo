@@ -19,15 +19,15 @@ cp env .env
 # Need to choose some values for the automated tests in Jenkins
 GCLOUD_REGION=us-west2
 
-toVersion=$(gcloud container get-server-config --zone "${GCLOUD_REGION}" 2>/dev/null | grep -A 1 validMasterVersions | tail -1 | sed 's/- //')
-fromVersion=$(gcloud container get-server-config --zone "${GCLOUD_REGION}" 2>/dev/null | grep -A 2 validMasterVersions | tail -1 | sed 's/- //')
+# get list of availbale master versions on the specified cloud region
+master_versions=$(gcloud container get-server-config --zone "${GCLOUD_REGION}" 2>/dev/null | awk '/validNodeVersions:/ {f=0;next}; f; /validMasterVersions/ {f=1}' | awk '{print $2}')
+# find two gke versions with different k8s versions
+to_from=$(echo $master_versions | awk '{to_long=$1; split($1,a,"-"); to_short=a[1]; for(i=2;i<= NF;i++) { split($i,b,"-"); if(b[1] != $to_short) {print $to_long","$i; break} }}')
+
+toVersion=${to_from%,*}
+fromVersion=${to_from#*,}
 toVersionShortName=$(echo "$toVersion" | cut -f1 -d'-')
 fromVersionShortName=$(echo "$fromVersion" | cut -f1 -d'-')
-
-toVersion="1.11.5-gke.5"
-fromVersion="1.10.12-gke.1"
-toVersionShortName="1.11.5"
-fromVersionShortName="1.10.12"
 
 sed -i "s/export K8S_VER=/export K8S_VER=${fromVersionShortName}/g" .env
 sed -i "s/export NEW_K8S_VER=/export NEW_K8S_VER=${toVersionShortName}/g" .env
