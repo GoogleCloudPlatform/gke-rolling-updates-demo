@@ -13,6 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+function test_versions {
+  test -n "${toVersion}" || { echo >&2 'no toVersion found.. Aborting'; exit 1; }
+  test -n "${fromVersion}" || { echo >&2 'no fromVersion found.. Aborting'; exit 1; }
+  test "${toVersionShortName}" != "${fromVersionShortName}" || { echo >&2 'toVersion and fromVersion selected are equal.. Aborting'; exit 1; }
+  to="$(echo $toVersionShortName | tr -d '.')"
+  from="$(echo $fromVersionShortName | tr -d '.')"
+  test "${to}" -gt "${from}" || { echo >&2 'toVersion is older than fromVersion.. Aborting'; exit 1; }
+}
+
 # All of the scripts expect to find ".env" in the root folder
 cp env .env
 # .env is used as a configuration file for the rest of the project.
@@ -28,6 +37,9 @@ toVersion=${to_from%,*}
 fromVersion=${to_from#*,}
 toVersionShortName=$(echo "$toVersion" | cut -f1 -d'-')
 fromVersionShortName=$(echo "$fromVersion" | cut -f1 -d'-')
+
+# make sure versions are relevant
+test_versions
 
 echo ""
 echo "Selected GKE version to migrate from: ${fromVersion}"
