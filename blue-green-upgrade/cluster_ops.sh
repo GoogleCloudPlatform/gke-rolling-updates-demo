@@ -174,7 +174,7 @@ create_cluster() {
     --region "${GCLOUD_REGION}" \
     --cluster-version "${K8S_VER}" \
     --machine-type "${MACHINE_TYPE}" \
-    --node-labels "nodepool=${K8S_VER}" \
+    --node-labels "nodepool=${GKE_VER}" \
     --num-nodes "${NUM_NODES}"
 
   # Acquire the kubectl credentials
@@ -250,10 +250,11 @@ new_node_pool() {
     --region "${GCLOUD_REGION}" \
     --num-nodes "${NUM_NODES}" \
     --machine-type "${MACHINE_TYPE}" \
-    --node-labels="nodepool=${NEW_K8S_VER}"
+    --node-labels="nodepool=${NEW_GKE_VER}"
 
   echo "Cordoning nodes in old node pool"
-  cordon_node_label "nodepool=${K8S_VER}"
+  echo Old: ${K8S_VER}-----New: ${NEW_K8S_VER}
+  cordon_node_label "nodepool=${GKE_VER}"
 }
 
 # Delete the node pool named "default-pool".
@@ -273,6 +274,15 @@ tear_down() {
     --project "${GCLOUD_PROJECT}" \
     --region "${GCLOUD_REGION}"; then
   echo "Deleting the GKE cluster ${CLUSTER_NAME}"
+  gcloud container clusters list --filter="STATUS:RUNNING AND NAME:$CLUSTER_NAME"
+  # Cluster might be still upgrading. Wait up to 5 mins and then delete it
+  COUNTER=0
+  until [ $(gcloud container clusters list --filter="STATUS:RUNNING AND NAME:$CLUSTER_NAME" | wc -l) -ne 0 -o $COUNTER -ge 5 ]; do
+    echo Waiting for cluster upgrade to finish...
+    sleep 60
+    COUNTER=$[$COUNTER+1]
+  done
+
   gcloud container clusters delete --quiet "${CLUSTER_NAME}" \
     --project "${GCLOUD_PROJECT}" \
     --region "${GCLOUD_REGION}"
@@ -303,7 +313,7 @@ auto() {
   create_cluster
   upgrade_control
   new_node_pool
-  drain_node_label "nodepool=${K8S_VER}"
+  drain_node_label "nodepool=${GKE_VER}"
   wait_for_upgrade
   delete_default_pool
   "${SCRIPT_HOME}/validate.sh"
@@ -333,10 +343,10 @@ case "${ACTION}" in
     new_node_pool
     ;;
   cordon-default-pool)
-    cordon_node_label "nodepool=${K8S_VER}"
+    cordon_node_label "nodepool=${GKE_VER}"
     ;;
   drain-default-pool)
-    drain_node_label "nodepool=${K8S_VER}"
+    drain_node_label "nodepool=${GKE_VER}"
     ;;
   delete-default-pool)
     delete_default_pool

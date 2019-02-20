@@ -214,6 +214,11 @@ setup_app() {
 
 # uninstall app
 uninstall_app() {
+  # Get the Credentials again just in case cluster is left over from previous run and cred is not pulled yet
+  gcloud container clusters get-credentials "${CLUSTER_NAME}" \
+    --region "${GCLOUD_REGION}" \
+    --project "${GCLOUD_PROJECT}"
+
   echo "Uninstalling Elasticsearch Cluster"
   kubectl -n default delete -f "${REPO_HOME}"/manifests/ || true
 
@@ -226,8 +231,10 @@ uninstall_app() {
   # Deleting and/or scaling a StatefulSet down will not delete the volumes associated with the StatefulSet.
   # This is done to ensure data safety, which is generally more valuable
   # than an automatic purge of all related StatefulSet resources.
+  echo "Delete PVCs..."
   kubectl -n default delete pvc -l component=elasticsearch,role=data || true
-
+  echo "Delete PVs..."
+  # kubectl delete pv $(kubectl get pv --all-namespaces | grep es-data | awk '{ print $1}')
   echo "kubectl get pvc --all-namespaces"
   kubectl -n default get pvc --all-namespaces
   echo "kubectl get pv --all-namespaces"
@@ -290,6 +297,13 @@ delete_cluster() {
   if gcloud container clusters describe "${CLUSTER_NAME}" \
     --project "${GCLOUD_PROJECT}" \
     --region "${GCLOUD_REGION}"; then
+  # Cluster might be still upgrading. Wait up to 5 mins and then delete it
+  COUNTER=0
+  until [ $(gcloud container clusters list --filter="STATUS:RUNNING AND NAME:$CLUSTER_NAME" | wc -l) -ne 0 -o $COUNTER -ge 5 ]; do
+    echo Waiting for cluster upgrade to finish...
+    sleep 60
+    COUNTER=$[$COUNTER+1]
+  done
   gcloud container clusters delete $"${CLUSTER_NAME}" \
     --project "${GCLOUD_PROJECT}" \
     --region "${GCLOUD_REGION}" \
