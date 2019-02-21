@@ -154,7 +154,7 @@ validate_elasticsearch() {
     -o jsonpath='{.spec.replicas}')
 
   if ! [[ "${CLIENTS_REQUEST}" == "${CLIENTS_AVAILABLE}" ]]; then
-    echo -n "ERROR: ${CLIENTS_AVAILABLE} master nodes available, but should be "
+    echo -n "ERROR: ${CLIENTS_AVAILABLE} client nodes available, but should be "
     echo "${MASTERS_REQUEST}"
     return 1
   else
@@ -169,7 +169,7 @@ validate_elasticsearch() {
     -o jsonpath='{.spec.replicas}')
 
   if ! [[ "${DATA_REQUEST}" == "${DATA_AVAILABLE}" ]]; then
-    echo -n "ERROR: ${DATA_AVAILABLE} master nodes available, but should be "
+    echo -n "ERROR: ${DATA_AVAILABLE} data nodes available, but should be "
     echo "${DATA_REQUEST}"
     return 1
   else
