@@ -198,16 +198,16 @@ setup_app() {
   kubectl -n default create -f "${REPO_HOME}/manifests/es-svc.yaml"
   kubectl -n default create -f "${REPO_HOME}/manifests/es-master-pdb.yaml"
   kubectl -n default create -f "${REPO_HOME}/manifests/es-master.yaml"
-  kubectl -n default rollout status -f "${REPO_HOME}/manifests/es-master.yaml"
+  kubectl -n default rollout status --timeout=2m -f "${REPO_HOME}/manifests/es-master.yaml"
 
   kubectl -n default create -f "${REPO_HOME}/manifests/es-client-pdb.yaml"
   kubectl -n default create -f "${REPO_HOME}/manifests/es-client.yaml"
-  kubectl -n default rollout status -f "${REPO_HOME}/manifests/es-client.yaml"
+  kubectl -n default rollout status --timeout=2m -f "${REPO_HOME}/manifests/es-client.yaml"
 
   kubectl -n default create -f "${REPO_HOME}/manifests/es-data-svc.yaml"
   kubectl -n default create -f "${REPO_HOME}/manifests/es-data-pdb.yaml"
   kubectl -n default create -f "${REPO_HOME}/manifests/es-data-stateful.yaml"
-  kubectl -n default rollout status -f "${REPO_HOME}/manifests/es-data-stateful.yaml"
+  kubectl -n default rollout status --timeout=2m -f "${REPO_HOME}/manifests/es-data-stateful.yaml"
 
   load_data
 }
