@@ -288,6 +288,12 @@ tear_down() {
   echo ""
   echo "Tearing down the infrastructure ....."
   echo ""
+  gcloud container clusters list | grep expand-contract-upgrade
+  retVal=$?
+  if [ $retVal -ne 0 ]; then
+    echo "Nothing to tear down"
+    return
+  fi  
   uninstall_app
   delete_cluster
 }
