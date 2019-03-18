@@ -31,7 +31,7 @@ GCLOUD_REGION=us-west2
 # get list of availbale master versions on the specified cloud region
 master_versions=$(gcloud container get-server-config --zone "${GCLOUD_REGION}" 2>/dev/null | awk '/validNodeVersions:/ {f=0;next}; f; /validMasterVersions/ {f=1}' | awk '{print $2}')
 # find two gke versions with different k8s versions
-to_from=$(echo $master_versions | awk '{to_long=$1; split($1,a,"-"); to_short=a[1]; for(i=2;i<= NF;i++) { split($i,b,"-"); if(b[1] != $to_short) {print $to_long","$i; break} }}')
+to_from=$(echo $master_versions | awk '{to_long=$1; split($1,a,"-"); for(i=2;i<= NF;i++) { split($i,b,"-"); if(b[1] != a[1]) {print $to_long","$i; break} }}')
 
 toVersion=${to_from%,*}
 fromVersion=${to_from#*,}
