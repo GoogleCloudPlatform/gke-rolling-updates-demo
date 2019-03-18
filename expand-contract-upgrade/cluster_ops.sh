@@ -276,7 +276,7 @@ upgrade_nodes() {
   echo "Upgrading the K8s nodes ....."
   echo ""
   gcloud container clusters upgrade "${CLUSTER_NAME}" \
-    --cluster-version="${NEW_K8S_VER}" \
+    --cluster-version="${NEW_GKE_VER}" \
     --region "${GCLOUD_REGION}" \
     --project "${GCLOUD_PROJECT}" \
     --quiet
