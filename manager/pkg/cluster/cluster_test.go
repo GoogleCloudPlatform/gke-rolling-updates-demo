@@ -36,10 +36,7 @@ import (
 
 	status "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
-
-	gstatus "google.golang.org/grpc/status"
 )
 
 var _ = io.EOF
@@ -115,7 +112,7 @@ func TestLatestMasterVersionForReleaseSeries(t *testing.T) {
 
 	client, _ := container.NewClusterManagerClient(context.Background(), clientOpt)
 
-	cluster := NewManagedCluster(client, "testing", "hello", "wassup", 0)
+	cluster := NewGKECluster(client, "testing", "hello", "wassup", 0)
 
 	mockClusterManager.err = nil
 	mockClusterManager.reqs = nil
@@ -151,30 +148,4 @@ func TestLatestMasterVersionForReleaseSeries(t *testing.T) {
 	if want, got := expectedResponse.ValidMasterVersions[3], resp; want != got {
 		t.Errorf("wrong response %q, want %q)", got, want)
 	}
-}
-
-func TestClusterManagerGetServerConfigError(t *testing.T) {
-	errCode := codes.PermissionDenied
-	mockClusterManager.err = gstatus.Error(errCode, "test error")
-
-	var projectId string = "projectId-1969970175"
-	var zone string = "zone3744684"
-	var request = &containerpb.GetServerConfigRequest{
-		ProjectId: projectId,
-		Zone:      zone,
-	}
-
-	c, err := container.NewClusterManagerClient(context.Background(), clientOpt)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	resp, err := c.GetServerConfig(context.Background(), request)
-
-	if st, ok := gstatus.FromError(err); !ok {
-		t.Errorf("got error %v, expected grpc error", err)
-	} else if c := st.Code(); c != errCode {
-		t.Errorf("got error code %q, want %q", c, errCode)
-	}
-	_ = resp
 }

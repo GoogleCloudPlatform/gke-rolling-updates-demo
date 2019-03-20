@@ -4,13 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/GoogleCloudPlatform/gke-rolling-updates-demo/manager/pkg/utils"
-
 	container "cloud.google.com/go/container/apiv1"
+	"github.com/GoogleCloudPlatform/gke-rolling-updates-demo/manager/pkg/operation"
 	containerpb "google.golang.org/genproto/googleapis/container/v1"
 )
 
-type ManagedCluster struct {
+type GKECluster struct {
 	Client      *container.ClusterManagerClient
 	Cluster     *containerpb.Cluster
 	Project     string
@@ -19,8 +18,8 @@ type ManagedCluster struct {
 	NodeCount   int32
 }
 
-func NewManagedCluster(client *container.ClusterManagerClient, project string, location string, clusterName string, nodeCount int32) *ManagedCluster {
-	return &ManagedCluster{
+func NewGKECluster(client *container.ClusterManagerClient, project string, location string, clusterName string, nodeCount int32) *GKECluster {
+	return &GKECluster{
 		Client:      client,
 		Project:     project,
 		Location:    location,
@@ -29,7 +28,7 @@ func NewManagedCluster(client *container.ClusterManagerClient, project string, l
 	}
 }
 
-func (c *ManagedCluster) Create(ctx context.Context) error {
+func (c *GKECluster) Create(ctx context.Context) error {
 	getReq := &containerpb.GetClusterRequest{
 		Name: fmt.Sprintf("projects/%s/locations/%s/clusters/%s", c.Project, c.Location, c.ClusterName),
 	}
@@ -49,7 +48,7 @@ func (c *ManagedCluster) Create(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("unable to create cluster: %s", err)
 	}
-	err = utils.WaitForOperation(ctx, c.Client, c.Project, c.Location, op.Name)
+	err = operation.WaitForOperation(ctx, c.Client, c.Project, c.Location, op.Name)
 	if err != nil {
 		return fmt.Errorf("error waiting for operation: %s", err)
 	}
@@ -62,7 +61,7 @@ func (c *ManagedCluster) Create(ctx context.Context) error {
 	return nil
 }
 
-func (c *ManagedCluster) UpgradeControlPlane(ctx context.Context, version string) error {
+func (c *GKECluster) UpgradeControlPlane(ctx context.Context, version string) error {
 	req := &containerpb.UpdateClusterRequest{
 		Name: fmt.Sprintf("projects/%s/locations/%s/clusters/%s", c.Project, c.Location, c.ClusterName),
 		Update: &containerpb.ClusterUpdate{
@@ -73,7 +72,7 @@ func (c *ManagedCluster) UpgradeControlPlane(ctx context.Context, version string
 	if err != nil {
 		return fmt.Errorf("unable to upgrade master version: %s", err)
 	}
-	err = utils.WaitForOperation(ctx, c.Client, c.Project, c.Location, resp.Name)
+	err = operation.WaitForOperation(ctx, c.Client, c.Project, c.Location, resp.Name)
 	if err != nil {
 		return fmt.Errorf("error waiting for operation: %s", err)
 	}
@@ -90,7 +89,7 @@ func (c *ManagedCluster) UpgradeControlPlane(ctx context.Context, version string
 	return nil
 }
 
-func (c *ManagedCluster) UpgradeNodes(ctx context.Context, version string) error {
+func (c *GKECluster) UpgradeNodes(ctx context.Context, version string) error {
 	req := &containerpb.UpdateClusterRequest{
 		Name: fmt.Sprintf("projects/%s/locations/%s/clusters/%s", c.Project, c.Location, c.ClusterName),
 		Update: &containerpb.ClusterUpdate{
@@ -101,7 +100,7 @@ func (c *ManagedCluster) UpgradeNodes(ctx context.Context, version string) error
 	if err != nil {
 		return fmt.Errorf("unable to upgrade master version: %s", err)
 	}
-	err = utils.WaitForOperation(ctx, c.Client, c.Project, c.Location, resp.Name)
+	err = operation.WaitForOperation(ctx, c.Client, c.Project, c.Location, resp.Name)
 	if err != nil {
 		return fmt.Errorf("error waiting for operation: %s", err)
 	}
@@ -118,7 +117,7 @@ func (c *ManagedCluster) UpgradeNodes(ctx context.Context, version string) error
 	return nil
 }
 
-func (c *ManagedCluster) LatestMasterVersionForReleaseSeries(ctx context.Context, version string) (string, error) {
+func (c *GKECluster) LatestMasterVersionForReleaseSeries(ctx context.Context, version string) (string, error) {
 	req := &containerpb.GetServerConfigRequest{
 		Name: fmt.Sprintf("projects/%s/locations/%s", c.Project, c.Location),
 	}

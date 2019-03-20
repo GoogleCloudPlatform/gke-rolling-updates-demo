@@ -26,14 +26,13 @@ import (
 )
 
 var (
-	master  bool
-	version string
+	master     bool
+	gkeVersion string
 )
 
-// versionCmd represents the version command
-var versionCmd = &cobra.Command{
-	Use:   "version",
-	Short: "Returns proper master and node versions for the given inputs",
+var gkeVersionCmd = &cobra.Command{
+	Use:   "gke-version",
+	Short: "Returns proper GKE master and node versions for the given inputs",
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
@@ -54,12 +53,12 @@ var versionCmd = &cobra.Command{
 			log.Fatalf("Must specify a cluster name")
 		}
 
-		cluster := cluster.NewManagedCluster(client, project, location, clusterName, 0)
+		cluster := cluster.NewGKECluster(client, project, location, clusterName, 0)
 
 		fmt.Printf("%v", cluster)
 
 		if master {
-			v, err := cluster.LatestMasterVersionForReleaseSeries(ctx, version)
+			v, err := cluster.LatestMasterVersionForReleaseSeries(ctx, gkeVersion)
 			if err != nil {
 				log.Fatalf("failed to get latest master versions: %s", err)
 			}
@@ -75,16 +74,9 @@ var versionCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(versionCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// versionCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	versionCmd.Flags().BoolVar(&master, "master", true, "Query for master version. Queries for node version if false")
-	versionCmd.Flags().StringVar(&version, "version", "latest", "Query for master version. Queries for node version if false")
+	rootCmd.AddCommand(gkeVersionCmd)
+	gkeVersionCmd.Flags().BoolVar(&master, "master", true, "Query for master version. Queries for node version if false")
+	gkeVersionCmd.Flags().StringVar(&gkeVersion, "version", "latest", "Query for master version. Queries for node version if false")
 }
+
+func initConfig() {}
