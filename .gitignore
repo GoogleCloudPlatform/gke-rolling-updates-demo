@@ -36,3 +36,7 @@ crash.log
 
 # .env files for demo environment variables
 *.env
+
+# Ignore Bazel build artifacts
+bazel
+bazel-*
