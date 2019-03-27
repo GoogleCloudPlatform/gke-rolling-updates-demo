@@ -27,31 +27,34 @@ import (
 	containerpb "google.golang.org/genproto/googleapis/container/v1"
 )
 
-func WaitForOperation(ctx context.Context, client *container.ClusterManagerClient, project string, location string, operationId string) error {
-	retryTime := 3
+type Status struct {
+	Status containerpb.Operation_Status
+	Error  error
+}
+
+// Wait waits for a GKE operation (not a project operation) to complete and
+// outputs current status to the provided channel
+func Wait(ctx context.Context, opChan chan Status, retryInterval int, client *container.ClusterManagerClient, project string, location string, operationID string) {
 	for {
 		req := &containerpb.GetOperationRequest{
 			Name:        fmt.Sprintf("projects/%s/locations/%s", project, location),
-			OperationId: operationId,
+			OperationId: operationID,
 		}
 
 		resp, err := client.GetOperation(ctx, req)
-		if err != nil {
-			return fmt.Errorf("unable to get operation: %s", err)
-		}
+		opChan <- Status{Status: resp.Status, Error: err}
 
 		if resp.Status == containerpb.Operation_DONE {
+			close(opChan)
 			break
 		}
 
 		log.WithFields(log.Fields{
 			"type":   resp.OperationType,
 			"status": resp.Status,
-		}).Info("waiting for operation")
+		}).Info("Waiting for operation")
 
-		toSleep, _ := time.ParseDuration(fmt.Sprintf("%ds", retryTime))
+		toSleep, _ := time.ParseDuration(fmt.Sprintf("%ds", retryInterval))
 		time.Sleep(toSleep)
 	}
-
-	return nil
 }

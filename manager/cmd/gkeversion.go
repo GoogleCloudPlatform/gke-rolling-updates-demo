@@ -51,13 +51,7 @@ var gkeVersionCmd = &cobra.Command{
 			log.Fatalf("Must specify a location")
 		}
 
-		if clusterName == "" {
-			log.Fatalf("Must specify a cluster name")
-		}
-
 		cluster := cluster.NewGKECluster(client, project, location, clusterName, 0)
-
-		fmt.Printf("%v", cluster)
 
 		if master {
 			v, err := cluster.LatestMasterVersionForReleaseSeries(ctx, gkeVersion)
@@ -68,10 +62,13 @@ var gkeVersionCmd = &cobra.Command{
 		}
 
 		if cluster.Cluster == nil {
-			fmt.Fprintf(os.Stderr, "cluster doesn't exist")
+			fmt.Fprintf(os.Stderr, "cluster doesn't exist\n")
 		}
 
-		fmt.Fprintf(os.Stdout, cluster.Cluster.GetCurrentMasterVersion())
+		_, err = fmt.Fprintf(os.Stdout, fmt.Sprintf("%s", cluster.Cluster.GetCurrentMasterVersion()))
+		if err != nil {
+			log.Fatalf("Failed writing to stdout: %v", err)
+		}
 	},
 }
 

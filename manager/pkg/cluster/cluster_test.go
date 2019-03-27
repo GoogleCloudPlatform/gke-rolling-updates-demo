@@ -86,13 +86,13 @@ func TestMain(m *testing.M) {
 
 	lis, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
-		log.Fatal(err)
+		log.Print(err)
 	}
 	go serv.Serve(lis)
 
 	conn, err := grpc.Dial(lis.Addr().String(), grpc.WithInsecure())
 	if err != nil {
-		log.Fatal(err)
+		log.Print(err)
 	}
 	clientOpt = option.WithGRPCConn(conn)
 
@@ -112,7 +112,7 @@ func TestLatestMasterVersionForReleaseSeries(t *testing.T) {
 
 	client, _ := container.NewClusterManagerClient(context.Background(), clientOpt)
 
-	cluster := NewGKECluster(client, "testing", "hello", "wassup", 0)
+	cluster := NewGKECluster(client, "hello", "test-zone1", "wassup", 0)
 
 	mockClusterManager.err = nil
 	mockClusterManager.reqs = nil
@@ -147,5 +147,76 @@ func TestLatestMasterVersionForReleaseSeries(t *testing.T) {
 
 	if want, got := expectedResponse.ValidMasterVersions[3], resp; want != got {
 		t.Errorf("wrong response %q, want %q)", got, want)
+	}
+}
+
+func TestLatestNodeVersionForReleaseSeries(t *testing.T) {
+	var validNodeVersions = []string{
+		"1.10.1-gke.5",
+		"1.9.2-gke.1",
+		"1.9.2-gke.0",
+		"1.9.1-gke.0",
+		"1.8.4-gke.1",
+	}
+	var expectedResponse = &containerpb.ServerConfig{
+		ValidNodeVersions: validNodeVersions,
+	}
+
+	client, _ := container.NewClusterManagerClient(context.Background(), clientOpt)
+
+	cluster := NewGKECluster(client, "hello", "test-zone1", "wassup", 0)
+	cluster.Cluster = &containerpb.Cluster{CurrentMasterVersion: "1.9.2-gke.1"}
+
+	mockClusterManager.err = nil
+	mockClusterManager.reqs = nil
+
+	mockClusterManager.resps = append(mockClusterManager.resps[:0], expectedResponse)
+
+	resp, err := cluster.LatestNodeVersionForReleaseSeries(context.Background(), "1.11")
+
+	if err == nil {
+		t.Errorf("expected error was not thrown, got %s", resp)
+	}
+
+	resp, err = cluster.LatestNodeVersionForReleaseSeries(context.Background(), "1.10")
+
+	if err == nil {
+		t.Errorf("expected error was not thrown, got %s", resp)
+	}
+
+	resp, err = cluster.LatestNodeVersionForReleaseSeries(context.Background(), "1.9")
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	if want, got := expectedResponse.ValidNodeVersions[1], resp; want != got {
+		t.Errorf("wrong response %q, want %q)", got, want)
+	}
+
+	resp, err = cluster.LatestNodeVersionForReleaseSeries(context.Background(), "1.9.1")
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	if want, got := expectedResponse.ValidNodeVersions[3], resp; want != got {
+		t.Errorf("wrong response %q, want %q)", got, want)
+	}
+
+	resp, err = cluster.LatestNodeVersionForReleaseSeries(context.Background(), "1.8")
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	if want, got := expectedResponse.ValidNodeVersions[4], resp; want != got {
+		t.Errorf("wrong response %q, want %q)", got, want)
+	}
+
+	resp, err = cluster.LatestNodeVersionForReleaseSeries(context.Background(), "1.7")
+
+	if err == nil {
+		t.Errorf("expected error was not thrown, got %s", resp)
 	}
 }
