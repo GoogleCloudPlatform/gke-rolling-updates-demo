@@ -253,7 +253,7 @@ new_node_pool() {
     --node-labels="nodepool=${NEW_GKE_VER}"
 
   echo "Cordoning nodes in old node pool"
-  echo Old: ${K8S_VER}-----New: ${NEW_K8S_VER}
+  echo "Old: ${K8S_VER}-----New: ${NEW_K8S_VER}"
   cordon_node_label "nodepool=${GKE_VER}"
 }
 
@@ -277,10 +277,10 @@ tear_down() {
   gcloud container clusters list --filter="STATUS:RUNNING AND NAME:$CLUSTER_NAME"
   # Cluster might be still upgrading. Wait up to 5 mins and then delete it
   COUNTER=0
-  until [ $(gcloud container clusters list --filter="STATUS:RUNNING AND NAME:$CLUSTER_NAME" | wc -l) -ne 0 -o $COUNTER -ge 5 ]; do
+  until [[ "$(gcloud container clusters list --filter="STATUS:RUNNING AND NAME:$CLUSTER_NAME" | wc -l)" -ne 0 || $COUNTER -ge 5 ]]; do
     echo Waiting for cluster upgrade to finish...
     sleep 60
-    COUNTER=$[$COUNTER+1]
+    COUNTER=$((COUNTER+1))
   done
 
   gcloud container clusters delete --quiet "${CLUSTER_NAME}" \
