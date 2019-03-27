@@ -39,6 +39,9 @@ resource "google_container_cluster" "test" {
   // We specify the machine type for the node pool instances.
   node_config {
     machine_type = "${var.machine_type}"
+    metadata {
+      disable-legacy-endpoints = "true"
+    }
   }
 
   // Some operations have been observed to take longer thant the defaults

@@ -18,8 +18,8 @@
 
 set -euo pipefail
 
-SCRIPT_HOME="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-REPO_HOME="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
+SCRIPT_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 fail() {
   echo "ERROR: ${*}"
@@ -52,7 +52,7 @@ if [[ $# -lt 1 ]]; then
 fi
 
 # Source the configuration file if it exists
-if [ -f "${REPO_HOME}/.env" ] ; then
+if [ -f "${REPO_HOME}/.env" ]; then
   # shellcheck source=.env
   source "${REPO_HOME}/.env"
 fi
@@ -60,37 +60,37 @@ fi
 # Set GCLOUD_ZONE to default if it has not yet been set
 GCLOUD_ZONE_DEFAULT=$(gcloud config get-value compute/zone)
 if [ "${GCLOUD_ZONE_DEFAULT}" == "(unset)" ]; then
- # check if defined in env file
- if [ -z ${GCLOUD_ZONE:+exists} ]; then
-   fail "GCLOUD_ZONE is not set"
- fi
+  # check if defined in env file
+  if [ -z ${GCLOUD_ZONE:+exists} ]; then
+    fail "GCLOUD_ZONE is not set"
+  fi
 else
- GCLOUD_ZONE="$GCLOUD_ZONE_DEFAULT"
- export GCLOUD_ZONE
+  GCLOUD_ZONE="$GCLOUD_ZONE_DEFAULT"
+  export GCLOUD_ZONE
 fi
 
 # Set GCLOUD_REGION to default if it has not yet been set
 GCLOUD_REGION_DEFAULT=$(gcloud config get-value compute/region)
 if [ "${GCLOUD_REGION_DEFAULT}" == "(unset)" ]; then
- # check if defined in env file
- if [ -z ${GCLOUD_REGION:+exists} ]; then
-   fail "GCLOUD_REGION is not set"
- fi
+  # check if defined in env file
+  if [ -z ${GCLOUD_REGION:+exists} ]; then
+    fail "GCLOUD_REGION is not set"
+  fi
 else
- GCLOUD_REGION="$GCLOUD_REGION_DEFAULT"
- export GCLOUD_REGION
+  GCLOUD_REGION="$GCLOUD_REGION_DEFAULT"
+  export GCLOUD_REGION
 fi
 
 # Set GCLOUD_PROJECT to default if it has not yet been set
 GCLOUD_PROJECT_DEFAULT=$(gcloud config get-value project)
 if [ "${GCLOUD_PROJECT_DEFAULT}" == "(unset)" ]; then
- # check if defined in env file
- if [ -z ${GCLOUD_PROJECT:+exists} ]; then
-   fail "GCLOUD_PROJECT is not set"
- fi
+  # check if defined in env file
+  if [ -z ${GCLOUD_PROJECT:+exists} ]; then
+    fail "GCLOUD_PROJECT is not set"
+  fi
 else
- GCLOUD_PROJECT="$GCLOUD_PROJECT_DEFAULT"
- export GCLOUD_PROJECT
+  GCLOUD_PROJECT="$GCLOUD_PROJECT_DEFAULT"
+  export GCLOUD_PROJECT
 fi
 
 if [ -z ${CLUSTER_NAME:+exists} ]; then
@@ -111,6 +111,14 @@ fi
 terraform_apply() {
   CONTROL_PLANE_VERSION=$1
   NODE_POOL_VERSION=$2
+
+  terraform plan -input=false \
+    -var control_plane_version="${CONTROL_PLANE_VERSION}" \
+    -var node_pool_version="${NODE_POOL_VERSION}" \
+    -var machine_type="${MACHINE_TYPE}" \
+    -var num_nodes="${NUM_NODES}" \
+    -var region="${GCLOUD_REGION}" \
+    -var zone="${GCLOUD_ZONE}"
 
   terraform apply -input=false -auto-approve \
     -var control_plane_version="${CONTROL_PLANE_VERSION}" \
@@ -184,25 +192,25 @@ auto() {
 
 ACTION=$1
 case "${ACTION}" in
-  auto)
-    auto
-    ;;
-  create)
-    create_cluster
-    ;;
-  upgrade-control)
-    upgrade_control
-    ;;
-  upgrade-nodes)
-    upgrade_nodes
-    ;;
-  downgrade-nodes)
-    downgrade_nodes
-    ;;
-  delete)
-    tear_down
-    ;;
-  *)
-    usage
-    ;;
+auto)
+  auto
+  ;;
+create)
+  create_cluster
+  ;;
+upgrade-control)
+  upgrade_control
+  ;;
+upgrade-nodes)
+  upgrade_nodes
+  ;;
+downgrade-nodes)
+  downgrade_nodes
+  ;;
+delete)
+  tear_down
+  ;;
+*)
+  usage
+  ;;
 esac
