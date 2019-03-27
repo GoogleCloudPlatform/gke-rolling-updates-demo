@@ -30,21 +30,7 @@ set -euo pipefail
 # "-                                                       -"
 # "---------------------------------------------------------"
 
-
-
-## source properties file
-SCRIPT_HOME="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-REPO_HOME="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
-# shellcheck source=.env
-source "${REPO_HOME}/.env"
-
-if [ -z ${CLUSTER_NAME:+exists} ]; then
-  CLUSTER_NAME="expand-contract-upgrade"
-  export CLUSTER_NAME
-fi
-
 ################  functions  ####################
-
 
 ## validate use of this script
 usage() {
@@ -117,30 +103,6 @@ check_apis() {
   fi
 }
 
-# Set GCLOUD_REGION to default if it has not yet been set
-GCLOUD_REGION_DEFAULT=$(gcloud config get-value compute/region)
-if [ "${GCLOUD_REGION_DEFAULT}" == "(unset)" ]; then
- # check if defined in env file
- if [ -z ${GCLOUD_REGION:+exists} ]; then
-   fail "GCLOUD_REGION is not set"
- fi
-else
- GCLOUD_REGION="$GCLOUD_REGION_DEFAULT"
- export GCLOUD_REGION
-fi
-
-# Set GCLOUD_PROJECT to default if it has not yet been set
-GCLOUD_PROJECT_DEFAULT=$(gcloud config get-value project)
-if [ "${GCLOUD_PROJECT_DEFAULT}" == "(unset)" ]; then
- # check if defined in env file
- if [ -z ${GCLOUD_PROJECT:+exists} ]; then
-   fail "GCLOUD_PROJECT is not set"
- fi
-else
- GCLOUD_PROJECT="$GCLOUD_PROJECT_DEFAULT"
- export GCLOUD_PROJECT
-fi
-
 ## create cluster
 create_cluster() {
   # create cluster
@@ -163,7 +125,7 @@ create_cluster() {
 ## Creates the Shakespeare index and loads the data
 load_data() {
   echo "Setting up port-forward to Elasticsearch client"
-  kubectl -n default port-forward svc/elasticsearch 9200 1>&2>/dev/null &
+  kubectl -n default port-forward svc/elasticsearch 9201:9200 1>&2>/dev/null &
   # Wait a couple seconds for connection to establish as that last command is
   # not blocking
   sleep 5
@@ -174,7 +136,7 @@ load_data() {
   curl -H "Content-Type: application/json" \
     -X PUT \
     -d @"${REPO_HOME}/data/mapping.json" \
-    'http://localhost:9200/shakespeare'
+    'http://localhost:9201/shakespeare'
   # The response does not make include a newline
   echo ""
 
@@ -183,7 +145,7 @@ load_data() {
   curl -H "Content-Type: application/x-ndjson" \
     -X POST \
     --data-binary @"${REPO_HOME}/data/shakespeare.json" \
-    'http://localhost:9200/shakespeare/doc/_bulk?pretty' > /dev/null
+    'http://localhost:9201/shakespeare/doc/_bulk?pretty' > /dev/null
 
   # If we've made it this far the data is loaded
   echo "Sample data successfully loaded!"
@@ -194,19 +156,19 @@ load_data() {
 ## Installs the Elasticsearch cluster
 setup_app() {
   echo "Installing Elasticsearch Cluster"
-  kubectl -n default create -f "${REPO_HOME}/manifests/es-discovery-svc.yaml"
-  kubectl -n default create -f "${REPO_HOME}/manifests/es-svc.yaml"
-  kubectl -n default create -f "${REPO_HOME}/manifests/es-master-pdb.yaml"
-  kubectl -n default create -f "${REPO_HOME}/manifests/es-master.yaml"
+  kubectl -n default apply -f "${REPO_HOME}/manifests/es-discovery-svc.yaml"
+  kubectl -n default apply -f "${REPO_HOME}/manifests/es-svc.yaml"
+  kubectl -n default apply -f "${REPO_HOME}/manifests/es-master-pdb.yaml"
+  kubectl -n default apply -f "${REPO_HOME}/manifests/es-master.yaml"
   kubectl -n default rollout status -f "${REPO_HOME}/manifests/es-master.yaml"
 
-  kubectl -n default create -f "${REPO_HOME}/manifests/es-client-pdb.yaml"
-  kubectl -n default create -f "${REPO_HOME}/manifests/es-client.yaml"
+  kubectl -n default apply -f "${REPO_HOME}/manifests/es-client-pdb.yaml"
+  kubectl -n default apply -f "${REPO_HOME}/manifests/es-client.yaml"
   kubectl -n default rollout status -f "${REPO_HOME}/manifests/es-client.yaml"
 
-  kubectl -n default create -f "${REPO_HOME}/manifests/es-data-svc.yaml"
-  kubectl -n default create -f "${REPO_HOME}/manifests/es-data-pdb.yaml"
-  kubectl -n default create -f "${REPO_HOME}/manifests/es-data-stateful.yaml"
+  kubectl -n default apply -f "${REPO_HOME}/manifests/es-data-svc.yaml"
+  kubectl -n default apply -f "${REPO_HOME}/manifests/es-data-pdb.yaml"
+  kubectl -n default apply -f "${REPO_HOME}/manifests/es-data-stateful.yaml"
   kubectl -n default rollout status -f "${REPO_HOME}/manifests/es-data-stateful.yaml"
 
   load_data
@@ -258,6 +220,7 @@ resize_node_pool() {
 
 ## upgrade the control plane
 upgrade_control() {
+  wait_for_upgrade
   echo ""
   echo "Upgrading the K8s control plane ....."
   echo ""
@@ -272,6 +235,7 @@ upgrade_control() {
 
 ## updgrade the node clusters
 upgrade_nodes() {
+  wait_for_upgrade
   echo ""
   echo "Upgrading the K8s nodes ....."
   echo ""
@@ -299,8 +263,9 @@ delete_cluster() {
     --region "${GCLOUD_REGION}"; then
   # Cluster might be still upgrading. Wait up to 5 mins and then delete it
   COUNTER=0
-  until [[ $(gcloud container clusters list --filter="STATUS:RUNNING AND NAME:$CLUSTER_NAME" | wc -l) -ne 0 || $COUNTER -ge 5 ]]; do
-    echo Waiting for cluster upgrade to finish...
+  wait_for_upgrade
+  until [[ $(gcloud container clusters list --filter="STATUS:RUNNING AND NAME:$CLUSTER_NAME" | wc -l) -ne 0 || $COUNTER -ge 10 ]]; do
+    echo Waiting for cluster operatoin to finish...
     sleep 60
     COUNTER=$((COUNTER+1))
   done
@@ -320,8 +285,7 @@ wait_for_upgrade() {
   OP_ID=$(gcloud container operations list \
     --project "${GCLOUD_PROJECT}" \
     --region "${GCLOUD_REGION}" \
-    --filter 'TYPE=UPGRADE_MASTER' \
-    --filter 'STATUS=RUNNING' \
+    --filter "TYPE=UPGRADE_MASTER AND STATUS=RUNNING AND targetLink:${CLUSTER_NAME}" \
     --format 'value(name)' \
     | head -n1 )
   if [[ "${OP_ID}" =~ ^operation-.* ]]; then
@@ -336,53 +300,91 @@ auto() {
   setup_app
   resize_node_pool 2
   # Unfortunate race condition here, a little sleep should be enough
-  sleep 10
-  wait_for_upgrade
+  sleep 30
   upgrade_control
-  wait_for_upgrade
   upgrade_nodes
   resize_node_pool 1
   "${SCRIPT_HOME}/validate.sh"
 }
 
-################  execution  ####################
+main() {
+  ## source properties file
+  SCRIPT_HOME="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+  REPO_HOME="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
+  # shellcheck source=.env
+  source "${REPO_HOME}/.env"
 
-# validate script called correctly
-if [[ $# -lt 1 ]]; then
-  usage
-fi
+  if [ -z ${CLUSTER_NAME:+exists} ]; then
+    CLUSTER_NAME="expand-contract-upgrade"
+    if [ ! -z ${BUILD_NUMBER:+exists} ]; then
+      CLUSTER_NAME="${CLUSTER_NAME}-${BUILD_NUMBER}"
+    fi
+    export CLUSTER_NAME
+  fi
 
-# check dependencies installed
-check_dependencies
+  # Set GCLOUD_REGION to default if it has not yet been set
+  GCLOUD_REGION_DEFAULT=$(gcloud config get-value compute/region)
+  if [ "${GCLOUD_REGION_DEFAULT}" == "(unset)" ]; then
+  # check if defined in env file
+  if [ -z ${GCLOUD_REGION:+exists} ]; then
+    fail "GCLOUD_REGION is not set"
+  fi
+  else
+  GCLOUD_REGION="$GCLOUD_REGION_DEFAULT"
+  export GCLOUD_REGION
+  fi
 
-# check project exist
-check_project
+  # Set GCLOUD_PROJECT to default if it has not yet been set
+  GCLOUD_PROJECT_DEFAULT=$(gcloud config get-value project)
+  if [ "${GCLOUD_PROJECT_DEFAULT}" == "(unset)" ]; then
+  # check if defined in env file
+  if [ -z ${GCLOUD_PROJECT:+exists} ]; then
+    fail "GCLOUD_PROJECT is not set"
+  fi
+  else
+  GCLOUD_PROJECT="$GCLOUD_PROJECT_DEFAULT"
+  export GCLOUD_PROJECT
+  fi
 
-# check apis enabled
-check_apis
-
-ACTION=$1
-case "${ACTION}" in
-  auto)
-    auto
-    ;;
-  create)
-    create_cluster
-    setup_app
-    ;;
-  resize)
-    resize_node_pool "$2"
-    ;;
-  upgrade-control)
-    upgrade_control
-    ;;
-  upgrade-nodes)
-    upgrade_nodes
-    ;;
-  delete)
-    tear_down
-    ;;
-  *)
+  # validate script called correctly
+  if [[ $# -lt 1 ]]; then
     usage
-    ;;
-esac
+  fi
+
+  # check dependencies installed
+  check_dependencies
+
+  # check project exist
+  check_project
+
+  # check apis enabled
+  check_apis
+
+  ACTION=$1
+  case "${ACTION}" in
+    auto)
+      auto
+      ;;
+    create)
+      create_cluster
+      setup_app
+      ;;
+    resize)
+      resize_node_pool "$2"
+      ;;
+    upgrade-control)
+      upgrade_control
+      ;;
+    upgrade-nodes)
+      upgrade_nodes
+      ;;
+    delete)
+      tear_down
+      ;;
+    *)
+      usage
+      ;;
+  esac
+}
+
+main "$@"

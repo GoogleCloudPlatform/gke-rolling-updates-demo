@@ -17,6 +17,10 @@ limitations under the License.
 // variables.tf - this is where all variables are defined.  The user must
 // provide these for any invocation of `terraform plan`, `apply`, or `destroy`.
 
+variable "cluster_name" {
+  description = "Name to give to the cluster"
+}
+
 variable "region" {
   description = "GCP region where Kubernetes Engine cluster would be created"
 }

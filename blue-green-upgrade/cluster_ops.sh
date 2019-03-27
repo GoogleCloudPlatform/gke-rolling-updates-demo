@@ -19,19 +19,10 @@
 # Stop immediately if something goes wrong
 set -euo pipefail
 
-# The absolute path to the root of the repository
-SCRIPT_HOME="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-REPO_HOME="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
-
 fail() {
   echo "ERROR: ${*}"
   exit 2
 }
-
-# Validate that this workstation has access to the required executables
-command -v kubectl >/dev/null || fail "kubectl is not installed!"
-command -v gcloud >/dev/null || fail "gcloud is not installed!"
-command -v jq >/dev/null || fail "jq is not installed!"
 
 usage() {
   cat <<-EOM
@@ -47,70 +38,6 @@ Where the <action> can be:
 EOM
   exit 1
 }
-
-# Validate the number of command line arguments
-if [[ $# -lt 1 ]]; then
-  usage
-fi
-
-# Source the properties file
-if [ -f "${REPO_HOME}/.env" ] ; then
-  # shellcheck source=.env
-  source "${REPO_HOME}/.env"
-else
-  echo "ERROR: Define a properties file '.env'"
-  exit 1
-fi
-
-CLOUDSDK_CORE_DISABLE_PROMPTS=0
-export CLOUDSDK_CORE_DISABLE_PROMPTS
-
-# Set GCLOUD_REGION to default if it has not yet been set
-GCLOUD_REGION_DEFAULT=$(gcloud config get-value compute/region)
-if [ "${GCLOUD_REGION_DEFAULT}" == "(unset)" ]; then
- # check if defined in env file
- if [ -z ${GCLOUD_REGION:+exists} ]; then
-   fail "GCLOUD_REGION is not set"
- fi
-else
- GCLOUD_REGION="$GCLOUD_REGION_DEFAULT"
- export GCLOUD_REGION
-fi
-
-# Set GCLOUD_PROJECT to default if it has not yet been set
-GCLOUD_PROJECT_DEFAULT=$(gcloud config get-value project)
-if [ "${GCLOUD_PROJECT_DEFAULT}" == "(unset)" ]; then
- # check if defined in env file
- if [ -z ${GCLOUD_PROJECT:+exists} ]; then
-   fail "GCLOUD_PROJECT is not set"
- fi
-else
- GCLOUD_PROJECT="$GCLOUD_PROJECT_DEFAULT"
- export GCLOUD_PROJECT
-fi
-
-# Set CLUSTER_NAME
-if [ -z ${CLUSTER_NAME:+exists} ]; then
-  CLUSTER_NAME="blue-green-test"
-  export CLUSTER_NAME
-fi
-
-# Check that the K8S_VER variable has been set
-if [ -z ${K8S_VER:+exists} ]; then
-  echo "ERROR: Set the K8S_VER environment variable"
-  exit 1
-fi
-
-# Check that the NEW_K8S_VER variable has been set
-if [ -z ${NEW_K8S_VER:+exists} ]; then
-  echo "ERROR: Set the NEW_K8S_VER environment variable"
-  exit 1
-fi
-
-# Validate the number of command line arguments
-if [[ $# -lt 1 ]]; then
-  usage
-fi
 
 load_data() {
   echo "Setting up port-forward to Elasticsearch client"
@@ -145,19 +72,19 @@ load_data() {
 # Installs the hello appF
 install_app() {
   echo "Installing Elasticsearch Cluster"
-  kubectl -n default create -f "${REPO_HOME}/manifests/es-discovery-svc.yaml"
-  kubectl -n default create -f "${REPO_HOME}/manifests/es-svc.yaml"
-  kubectl -n default create -f "${REPO_HOME}/manifests/es-master-pdb.yaml"
-  kubectl -n default create -f "${REPO_HOME}/manifests/es-master.yaml"
+  kubectl -n default apply -f "${REPO_HOME}/manifests/es-discovery-svc.yaml"
+  kubectl -n default apply -f "${REPO_HOME}/manifests/es-svc.yaml"
+  kubectl -n default apply -f "${REPO_HOME}/manifests/es-master-pdb.yaml"
+  kubectl -n default apply -f "${REPO_HOME}/manifests/es-master.yaml"
   kubectl -n default rollout status -f "${REPO_HOME}/manifests/es-master.yaml"
 
-  kubectl -n default create -f "${REPO_HOME}/manifests/es-client-pdb.yaml"
-  kubectl -n default create -f "${REPO_HOME}/manifests/es-client.yaml"
+  kubectl -n default apply -f "${REPO_HOME}/manifests/es-client-pdb.yaml"
+  kubectl -n default apply -f "${REPO_HOME}/manifests/es-client.yaml"
   kubectl -n default rollout status -f "${REPO_HOME}/manifests/es-client.yaml"
 
-  kubectl -n default create -f "${REPO_HOME}/manifests/es-data-svc.yaml"
-  kubectl -n default create -f "${REPO_HOME}/manifests/es-data-pdb.yaml"
-  kubectl -n default create -f "${REPO_HOME}/manifests/es-data-stateful.yaml"
+  kubectl -n default apply -f "${REPO_HOME}/manifests/es-data-svc.yaml"
+  kubectl -n default apply -f "${REPO_HOME}/manifests/es-data-pdb.yaml"
+  kubectl -n default apply -f "${REPO_HOME}/manifests/es-data-stateful.yaml"
   kubectl -n default rollout status -f "${REPO_HOME}/manifests/es-data-stateful.yaml"
 
   load_data
@@ -296,8 +223,7 @@ wait_for_upgrade() {
   OP_ID=$(gcloud container operations list \
     --project "${GCLOUD_PROJECT}" \
     --region "${GCLOUD_REGION}" \
-    --filter 'TYPE=UPGRADE_MASTER' \
-    --filter 'STATUS=RUNNING' \
+    --filter "TYPE=UPGRADE_MASTER AND STATUS=RUNNING AND targetLink:${CLUSTER_NAME}" \
     --format 'value(name)' \
     | head -n1 )
   if [[ "${OP_ID}" =~ ^operation-.* ]]; then
@@ -313,48 +239,129 @@ auto() {
   create_cluster
   upgrade_control
   new_node_pool
+  wait_for_upgrade
   drain_node_label "nodepool=${GKE_VER}"
   wait_for_upgrade
   delete_default_pool
   "${SCRIPT_HOME}/validate.sh"
 }
 
-ACTION=$1
-case "${ACTION}" in
-  auto)
-    CLOUDSDK_CORE_DISABLE_PROMPTS=1
-    export CLOUDSDK_CORE_DISABLE_PROMPTS
-    auto
-    unset CLOUDSDK_CORE_DISABLE_PROMPTS
-    ;;
-  create)
-    create_cluster
-    ;;
-  install-app)
-    install_app
-    ;;
-  load-data)
-    load_data
-    ;;
-  upgrade-control)
-    upgrade_control
-    ;;
-  new-node-pool)
-    new_node_pool
-    ;;
-  cordon-default-pool)
-    cordon_node_label "nodepool=${GKE_VER}"
-    ;;
-  drain-default-pool)
-    drain_node_label "nodepool=${GKE_VER}"
-    ;;
-  delete-default-pool)
-    delete_default_pool
-    ;;
-  delete)
-    tear_down
-    ;;
-  *)
+main() {
+  # The absolute path to the root of the repository
+  SCRIPT_HOME="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+  REPO_HOME="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
+
+  # Validate that this workstation has access to the required executables
+  command -v kubectl >/dev/null || fail "kubectl is not installed!"
+  command -v gcloud >/dev/null || fail "gcloud is not installed!"
+  command -v jq >/dev/null || fail "jq is not installed!"
+
+  # Validate the number of command line arguments
+  if [[ $# -lt 1 ]]; then
     usage
-    ;;
-esac
+  fi
+
+  # Source the properties file
+  if [ -f "${REPO_HOME}/.env" ] ; then
+    # shellcheck source=.env
+    source "${REPO_HOME}/.env"
+  else
+    echo "ERROR: Define a properties file '.env'"
+    exit 1
+  fi
+
+  CLOUDSDK_CORE_DISABLE_PROMPTS=0
+  export CLOUDSDK_CORE_DISABLE_PROMPTS
+
+  # Set GCLOUD_REGION to default if it has not yet been set
+  GCLOUD_REGION_DEFAULT=$(gcloud config get-value compute/region)
+  if [ "${GCLOUD_REGION_DEFAULT}" == "(unset)" ]; then
+  # check if defined in env file
+  if [ -z ${GCLOUD_REGION:+exists} ]; then
+    fail "GCLOUD_REGION is not set"
+  fi
+  else
+  GCLOUD_REGION="$GCLOUD_REGION_DEFAULT"
+  export GCLOUD_REGION
+  fi
+
+  # Set GCLOUD_PROJECT to default if it has not yet been set
+  GCLOUD_PROJECT_DEFAULT=$(gcloud config get-value project)
+  if [ "${GCLOUD_PROJECT_DEFAULT}" == "(unset)" ]; then
+  # check if defined in env file
+  if [ -z ${GCLOUD_PROJECT:+exists} ]; then
+    fail "GCLOUD_PROJECT is not set"
+  fi
+  else
+  GCLOUD_PROJECT="$GCLOUD_PROJECT_DEFAULT"
+  export GCLOUD_PROJECT
+  fi
+
+  # Set CLUSTER_NAME
+  if [ -z ${CLUSTER_NAME:+exists} ]; then
+    CLUSTER_NAME="blue-green-test"
+    if [ ! -z ${BUILD_NUMBER:+exists} ]; then
+      CLUSTER_NAME="${CLUSTER_NAME}-${BUILD_NUMBER}"
+    fi
+    export CLUSTER_NAME
+  fi
+
+  # Check that the K8S_VER variable has been set
+  if [ -z ${K8S_VER:+exists} ]; then
+    echo "ERROR: Set the K8S_VER environment variable"
+    exit 1
+  fi
+
+  # Check that the NEW_K8S_VER variable has been set
+  if [ -z ${NEW_K8S_VER:+exists} ]; then
+    echo "ERROR: Set the NEW_K8S_VER environment variable"
+    exit 1
+  fi
+
+  # Validate the number of command line arguments
+  if [[ $# -lt 1 ]]; then
+    usage
+  fi
+
+  ACTION=$1
+  case "${ACTION}" in
+    auto)
+      CLOUDSDK_CORE_DISABLE_PROMPTS=1
+      export CLOUDSDK_CORE_DISABLE_PROMPTS
+      auto
+      unset CLOUDSDK_CORE_DISABLE_PROMPTS
+      ;;
+    create)
+      create_cluster
+      ;;
+    install-app)
+      install_app
+      ;;
+    load-data)
+      load_data
+      ;;
+    upgrade-control)
+      upgrade_control
+      ;;
+    new-node-pool)
+      new_node_pool
+      ;;
+    cordon-default-pool)
+      cordon_node_label "nodepool=${GKE_VER}"
+      ;;
+    drain-default-pool)
+      drain_node_label "nodepool=${GKE_VER}"
+      ;;
+    delete-default-pool)
+      delete_default_pool
+      ;;
+    delete)
+      tear_down
+      ;;
+    *)
+      usage
+      ;;
+  esac
+}
+
+main "$@"

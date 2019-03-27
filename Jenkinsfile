@@ -22,11 +22,12 @@ limitations under the License.
 // Reference: https://github.com/jenkinsci/kubernetes-plugin
 
 // set up pod label and GOOGLE_APPLICATION_CREDENTIALS (for Terraform)
-def label = "k8s-infra"
-def containerName = "k8s-node"
-def GOOGLE_APPLICATION_CREDENTIALS    = '/home/jenkins/dev/jenkins-deploy-dev-infra.json'
-
-podTemplate(label: label, yaml: """
+pipeline {
+  agent {
+    kubernetes {
+      label 'k8s-infra'
+      defaultContainer 'k8s-node'
+      yaml """
 apiVersion: v1
 kind: Pod
 metadata:
@@ -34,7 +35,7 @@ metadata:
     jenkins: build-node
 spec:
   containers:
-  - name: ${containerName}
+  - name: k8s-node
     image: gcr.io/pso-helmsman-cicd/jenkins-k8s-node:${env.CONTAINER_VERSION}
     command: ['cat']
     tty: true
@@ -48,16 +49,15 @@ spec:
     secret:
       secretName: jenkins-deploy-dev-infra
 """
- ) {
- node(label) {
-  try {
-    // Options covers all other job properties or wrapper functions that apply to entire Pipeline.
-    properties([disableConcurrentBuilds()])
-    // set env variable GOOGLE_APPLICATION_CREDENTIALS for Terraform
-    env.GOOGLE_APPLICATION_CREDENTIALS=GOOGLE_APPLICATION_CREDENTIALS
-
+    }
+  }
+  environment {
+    GOOGLE_APPLICATION_CREDENTIALS = '/home/jenkins/dev/jenkins-deploy-dev-infra.json'
+  }
+  stages {
     stage('Setup') {
-        container(containerName) {
+      steps {
+        container('k8s-node-expand-contract') {
           // checkout code from scm i.e. commits related to the PR
           checkout scm
 
@@ -66,52 +66,76 @@ spec:
           sh "gcloud config set compute/zone ${env.CLUSTER_ZONE}"
           sh "gcloud config set core/project ${env.PROJECT_ID}"
           sh "gcloud config set compute/region ${env.REGION}"
-         }
+        }
+        container('k8s-node-rolling-upgrade') {
+          // checkout code from scm i.e. commits related to the PR
+          checkout scm
+
+          // Setup gcloud service account access
+          sh "gcloud auth activate-service-account --key-file=${GOOGLE_APPLICATION_CREDENTIALS}"
+          sh "gcloud config set compute/zone ${env.CLUSTER_ZONE}"
+          sh "gcloud config set core/project ${env.PROJECT_ID}"
+          sh "gcloud config set compute/region ${env.REGION}"
+        }
+        container('k8s-node-blue-green') {
+          // checkout code from scm i.e. commits related to the PR
+          checkout scm
+
+          // Setup gcloud service account access
+          sh "gcloud auth activate-service-account --key-file=${GOOGLE_APPLICATION_CREDENTIALS}"
+          sh "gcloud config set compute/zone ${env.CLUSTER_ZONE}"
+          sh "gcloud config set core/project ${env.PROJECT_ID}"
+          sh "gcloud config set compute/region ${env.REGION}"
+        }
+      }
     }
-    stage('configure environment file') {
+    stage('Configure environment') {
+      steps {
         container('k8s-node') {
           sh './test/configure-jenkins-environment.sh'
         }
+      }
     }
-    // lint relies on .env which will be generate from the `configure environment file` step
     stage('Lint') {
-        container(containerName) {
+      steps {
+        container('k8s-node') {
           sh "make lint"
+        }
       }
     }
-    stage('expand-contract-upgrade') {
-        container('k8s-node') {
-             sh 'make expand-contract-upgrade'
+    stage('Run Tests') {
+      parallel {
+        stage('Expand/Contract Upgrade') {
+          steps {
+            sh 'make expand-contract-upgrade'
+          }
+          post {
+            always {
+              sh 'make expand-contract-upgrade-delete'
+            }
+          }
         }
-    }
-    stage('in-place-rolling-upgrade') {
-        container('k8s-node') {
-          sh 'make in-place-rolling-upgrade'
+        stage('In-Place Rolling Upgrade') {
+          steps {
+            sh 'make in-place-rolling-upgrade'
+          }
+          post {
+            always {
+              sh 'make in-place-rolling-upgrade-delete'
+            }
+          }
         }
-    }
-    stage('blue-green-upgrade') {
-        container('k8s-node') {
+        stage('Blue/Green Upgrade') {
+          steps {
             sh 'make blue-green-upgrade'
+          }
+          post {
+            always {
+              sh 'make blue-green-upgrade-delete'
+            }
+          }
         }
-    }
-
-  }
-   catch (err) {
-      // if any exception occurs, mark the build as failed
-      // and display a detailed message on the Jenkins console output
-      currentBuild.result = 'FAILURE'
-      echo "FAILURE caught echo ${err}"
-      throw err
-   }
-   finally {
-     stage('Teardown') {
-      container(containerName) {
-        sh 'make expand-contract-upgrade-delete'
-        sh 'make in-place-rolling-upgrade-delete'
-        sh 'make blue-green-upgrade-delete'
-        sh 'gcloud auth revoke'
       }
-     }
-   }
+    }
   }
 }
