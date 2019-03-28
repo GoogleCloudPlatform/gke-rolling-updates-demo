@@ -19,9 +19,11 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -65,18 +67,34 @@ var rootCmd = &cobra.Command{
 			log.WithField("error", err).Fatalf("Unable to get regions")
 		}
 
+		regions.Regions = shuffle(regions.Regions)
+
 		for _, region := range regions.Regions {
 			clusterCpus, err := getTotalCpus(machineType, nodeCount)
 			if err != nil {
 				log.WithField("error", err).Fatalf("Unable to calculate total CPUs needed")
 			}
+
+			log.WithFields(log.Fields{
+				"region":         region.Name,
+				"available_cpus": (region.CPULimit() - region.CPUUsage()),
+				"requested_cpus": clusterCpus,
+			}).Info("Comparing CPU quota to request")
+
 			if clusterCpus <= (region.CPULimit() - region.CPUUsage()) {
-				_, err := fmt.Fprintf(os.Stdout, region.Name)
+				var zones []string
+				for _, zone := range region.Zones {
+					fmtZone := strings.Split(zone, "/")
+					zones = append(zones, fmtZone[len(fmtZone)-1])
+				}
+				_, err := fmt.Fprintf(os.Stdout, "%s;%s", region.Name, strings.Join(zones, ","))
 				if err != nil {
 					log.WithField("error", err).Fatalf("Unable to write to stdout")
 				}
 				break
 			}
+
+			log.WithField("region", region.Name).Info("Region does not have quota to meet request")
 		}
 	},
 }
@@ -96,12 +114,13 @@ func init() {
 	rootCmd.PersistentFlags().IntVar(&nodeCount, "node-count", -1, "number of nodes to use to calculate required capacity")
 }
 
+// getTotalCpus calculates the total number of CPUs needed give a
 func getTotalCpus(machineType string, nodeCount int) (int, error) {
 	cpus, err := cpusForMachineType(machineType)
 	if err != nil {
 		return cpus, fmt.Errorf("unable to get CPUs for machine type: %s", err)
 	}
-	return cpus, nil
+	return cpus * nodeCount, nil
 }
 
 func cpusForMachineType(machineType string) (int, error) {
@@ -121,4 +140,17 @@ func cpusForMachineType(machineType string) (int, error) {
 	}
 	return cpus, nil
 
+}
+
+func shuffle(regions []*regions.Region) []*regions.Region {
+	rand.Seed(time.Now().UTC().UnixNano())
+	for i := range regions {
+		if i == 0 {
+			continue
+		}
+		temp := regions[i]
+		regions[i] = regions[rand.Intn(i)]
+		regions[rand.Intn(i)] = temp
+	}
+	return regions
 }
