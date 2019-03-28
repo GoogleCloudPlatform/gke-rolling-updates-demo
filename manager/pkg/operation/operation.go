@@ -27,6 +27,7 @@ import (
 	containerpb "google.golang.org/genproto/googleapis/container/v1"
 )
 
+// Status represents the return type of an operation.
 type Status struct {
 	Status containerpb.Operation_Status
 	Error  error

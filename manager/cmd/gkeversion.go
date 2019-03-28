@@ -43,22 +43,9 @@ var gkeVersionCmd = &cobra.Command{
 			log.Fatalf("unable to create cluster manager client: %s", err)
 		}
 
-		if project == "" {
-			log.Fatalf("Must specify a project")
-		}
-
-		if location == "" {
-			log.Fatalf("Must specify a location")
-		}
-
-		cluster := cluster.NewGKECluster(client, project, location, clusterName, 0)
-
-		if master {
-			v, err := cluster.LatestMasterVersionForReleaseSeries(ctx, gkeVersion)
-			if err != nil {
-				log.Fatalf("failed to get latest master versions: %s", err)
-			}
-			fmt.Fprintf(os.Stdout, v)
+		cluster, err := cluster.NewGKECluster(client, project, location, clusterName, 0)
+		if err != nil {
+			log.Fatalf("error getting GKE cluster handle: %s", err)
 		}
 
 		if cluster.Cluster == nil {
@@ -77,5 +64,3 @@ func init() {
 	gkeVersionCmd.Flags().BoolVar(&master, "master", true, "Query for master version. Queries for node version if false")
 	gkeVersionCmd.Flags().StringVar(&gkeVersion, "version", "latest", "Query for master version. Queries for node version if false")
 }
-
-func initConfig() {}

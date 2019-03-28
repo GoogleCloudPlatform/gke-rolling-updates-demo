@@ -21,6 +21,10 @@ import (
 	"fmt"
 	"strings"
 
+	"google.golang.org/grpc/codes"
+
+	"google.golang.org/grpc/status"
+
 	container "cloud.google.com/go/container/apiv1"
 	"github.com/GoogleCloudPlatform/gke-rolling-updates-demo/manager/pkg/operation"
 	log "github.com/sirupsen/logrus"
@@ -31,6 +35,27 @@ const (
 	retryInterval = 3
 )
 
+// Error is the error type used to signal a cluster is in a bad state
+type Error struct {
+	error
+	clusterStatus containerpb.Cluster_Status
+}
+
+// ClusterStatus returns the cluster status
+func (e *Error) ClusterStatus() containerpb.Cluster_Status {
+	return e.clusterStatus
+}
+
+// Get makes a call to the GKE API to get a cluster based on the location triplet
+func Get(client *container.ClusterManagerClient, project string, location string, clusterName string) (*containerpb.Cluster, error) {
+	getReq := &containerpb.GetClusterRequest{
+		Name: fmt.Sprintf("projects/%s/locations/%s/clusters/%s", project, location, clusterName),
+	}
+
+	return client.GetCluster(context.Background(), getReq)
+}
+
+// GKECluster represents a GKE cluster that exists in GCP
 type GKECluster struct {
 	Client      *container.ClusterManagerClient
 	Cluster     *containerpb.Cluster
@@ -40,14 +65,36 @@ type GKECluster struct {
 	NodeCount   int32
 }
 
-func NewGKECluster(client *container.ClusterManagerClient, project string, location string, clusterName string, nodeCount int32) *GKECluster {
-	return &GKECluster{
+// NewGKECluster creates a handler for a cluster with the provided information
+func NewGKECluster(client *container.ClusterManagerClient, project string, location string, clusterName string, nodeCount int32) (*GKECluster, error) {
+	c := &GKECluster{
 		Client:      client,
 		Project:     project,
 		Location:    location,
 		ClusterName: clusterName,
 		NodeCount:   nodeCount,
 	}
+
+	resp, err := Get(c.Client, c.Project, c.Location, c.ClusterName)
+	if err != nil {
+		e, ok := status.FromError(err)
+
+		if ok && e.Code() == codes.NotFound {
+			err := c.Create(context.Background())
+			if err != nil {
+				return nil, fmt.Errorf("error creating cluster: %s", err)
+			}
+			return c, nil
+		} else if ok {
+			return nil, fmt.Errorf("gRPC error creating cluster handler: %s", err)
+		} else {
+			return nil, fmt.Errorf("unknown error creating cluster handler: %s", err)
+		}
+	}
+
+	c.Cluster = resp
+
+	return c, nil
 }
 
 // Create is used to instantiate the Cluster struct embedded into the GKECluster struct.
@@ -55,14 +102,10 @@ func NewGKECluster(client *container.ClusterManagerClient, project string, locat
 // If one does, GKECluster's Cluster value will be attached to that cluster; otherwise,
 // a new GKE cluster is created.
 func (c *GKECluster) Create(ctx context.Context) error {
-	getReq := &containerpb.GetClusterRequest{
-		Name: fmt.Sprintf("projects/%s/locations/%s/clusters/%s", c.Project, c.Location, c.ClusterName),
+	if c.Cluster != nil {
+		return fmt.Errorf("cluster already exists")
 	}
-	resp, err := c.Client.GetCluster(ctx, getReq)
-	if resp != nil {
-		c.Cluster = resp
-		return nil
-	}
+
 	req := &containerpb.CreateClusterRequest{
 		Parent: fmt.Sprintf("projects/%s/locations/%s", c.Project, c.Location),
 		Cluster: &containerpb.Cluster{
@@ -96,9 +139,17 @@ func (c *GKECluster) Create(ctx context.Context) error {
 		}).Info("Waiting for operation")
 	}
 
-	resp, err = c.Client.GetCluster(ctx, getReq)
+	getReq := &containerpb.GetClusterRequest{
+		Name: fmt.Sprintf("projects/%s/locations/%s/clusters/%s", c.Project, c.Location, c.ClusterName),
+	}
+
+	resp, err := c.Client.GetCluster(ctx, getReq)
 	if err != nil {
 		return fmt.Errorf("unable to fetch created cluster metadata: %s", err)
+	}
+
+	if resp.Status == containerpb.Cluster_ERROR {
+		return Error{clusterStatus: resp.Status}
 	}
 	c.Cluster = resp
 	return nil

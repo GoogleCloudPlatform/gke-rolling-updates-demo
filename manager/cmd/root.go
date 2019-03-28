@@ -24,7 +24,6 @@ import (
 )
 
 var (
-	cfgFile     string
 	project     string
 	location    string
 	clusterName string
@@ -36,6 +35,7 @@ var rootCmd = &cobra.Command{
 	Long:  ``,
 }
 
+// Execute is the entrypoint for the application
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
@@ -44,7 +44,6 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.manager.yaml)")
 	rootCmd.PersistentFlags().StringVar(&project, "project", "", "GCP project to run against")
 	rootCmd.PersistentFlags().StringVar(&location, "location", "", "region/zone to use")
 	rootCmd.PersistentFlags().StringVar(&clusterName, "cluster-name", "", "name of cluster")

@@ -58,6 +58,18 @@ type mockClusterManagerServer struct {
 	resps []proto.Message
 }
 
+func (s *mockClusterManagerServer) GetCluster(ctx context.Context, req *containerpb.GetClusterRequest) (*containerpb.Cluster, error) {
+	md, _ := metadata.FromIncomingContext(ctx)
+	if xg := md["x-goog-api-client"]; len(xg) == 0 || !strings.Contains(xg[0], "gl-go/") {
+		return nil, fmt.Errorf("x-goog-api-client = %v, expected gl-go key", xg)
+	}
+	s.reqs = append(s.reqs, req)
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.resps[0].(*containerpb.Cluster), nil
+}
+
 func (s *mockClusterManagerServer) GetServerConfig(ctx context.Context, req *containerpb.GetServerConfigRequest) (*containerpb.ServerConfig, error) {
 	md, _ := metadata.FromIncomingContext(ctx)
 	if xg := md["x-goog-api-client"]; len(xg) == 0 || !strings.Contains(xg[0], "gl-go/") {
@@ -110,12 +122,21 @@ func TestLatestMasterVersionForReleaseSeries(t *testing.T) {
 		ValidMasterVersions: validMasterVersions,
 	}
 
-	client, _ := container.NewClusterManagerClient(context.Background(), clientOpt)
+	var expectedClusterResponse = &containerpb.Cluster{
+		CurrentMasterVersion: "1.9.2-gke.1",
+	}
 
-	cluster := NewGKECluster(client, "hello", "test-zone1", "wassup", 0)
+	client, _ := container.NewClusterManagerClient(context.Background(), clientOpt)
 
 	mockClusterManager.err = nil
 	mockClusterManager.reqs = nil
+
+	mockClusterManager.resps = append(mockClusterManager.resps[:0], expectedClusterResponse)
+
+	cluster, err := NewGKECluster(client, "hello", "wassup", "hola", int32(0))
+	if err != nil {
+		t.Errorf("error creating cluster handle: %s", err)
+	}
 
 	mockClusterManager.resps = append(mockClusterManager.resps[:0], expectedResponse)
 
@@ -162,13 +183,21 @@ func TestLatestNodeVersionForReleaseSeries(t *testing.T) {
 		ValidNodeVersions: validNodeVersions,
 	}
 
-	client, _ := container.NewClusterManagerClient(context.Background(), clientOpt)
+	var expectedClusterResponse = &containerpb.Cluster{
+		CurrentMasterVersion: "1.9.2-gke.1",
+	}
 
-	cluster := NewGKECluster(client, "hello", "test-zone1", "wassup", 0)
-	cluster.Cluster = &containerpb.Cluster{CurrentMasterVersion: "1.9.2-gke.1"}
+	client, _ := container.NewClusterManagerClient(context.Background(), clientOpt)
 
 	mockClusterManager.err = nil
 	mockClusterManager.reqs = nil
+
+	mockClusterManager.resps = append(mockClusterManager.resps[:0], expectedClusterResponse)
+
+	cluster, err := NewGKECluster(client, "hello", "wassup", "hola", int32(0))
+	if err != nil {
+		t.Errorf("error creating cluster handle: %s", err)
+	}
 
 	mockClusterManager.resps = append(mockClusterManager.resps[:0], expectedResponse)
 
