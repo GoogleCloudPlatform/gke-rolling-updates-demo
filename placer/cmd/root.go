@@ -114,7 +114,8 @@ func init() {
 	rootCmd.PersistentFlags().IntVar(&nodeCount, "node-count", -1, "number of nodes to use to calculate required capacity")
 }
 
-// getTotalCpus calculates the total number of CPUs needed give a
+// getTotalCpus calculates the total number of CPUs used by a certain number of
+// machines of a given machine type.
 func getTotalCpus(machineType string, nodeCount int) (int, error) {
 	cpus, err := cpusForMachineType(machineType)
 	if err != nil {
@@ -123,6 +124,8 @@ func getTotalCpus(machineType string, nodeCount int) (int, error) {
 	return cpus * nodeCount, nil
 }
 
+// cpusForMachineType parses a machine type and returns the number of CPUs it
+// uses.
 func cpusForMachineType(machineType string) (int, error) {
 	parsedMachineType := strings.Split(machineType, "-")
 
@@ -142,6 +145,9 @@ func cpusForMachineType(machineType string) (int, error) {
 
 }
 
+// shuffle randomizes a list of regions. It implements a Fisher-Yates shuffle
+// using pseudo-random values generated generated from a seed based on the
+// timestamp.
 func shuffle(regions []*regions.Region) []*regions.Region {
 	rand.Seed(time.Now().UTC().UnixNano())
 	for i := range regions {

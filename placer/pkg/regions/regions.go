@@ -24,11 +24,14 @@ import (
 	"google.golang.org/api/compute/v1"
 )
 
+// Regions is a wrapper struct that holds a list of the helper type Region
 type Regions struct {
 	Service *compute.Service
 	Regions []*Region
 }
 
+// New creates a new Regions struct and populates it with the current state
+// of the regions.
 func New(service *compute.Service, project string) (*Regions, error) {
 	regionsListCall := service.Regions.List(project)
 
@@ -62,10 +65,13 @@ func New(service *compute.Service, project string) (*Regions, error) {
 	}, nil
 }
 
+// Region is a wrapper struct used to allow for extra methods to be added to
+// the compute.Region type.
 type Region struct {
 	*compute.Region
 }
 
+// CPUUsage returns the CPU quota usage for a given region
 func (r *Region) CPUUsage() int {
 	for _, v := range r.Quotas {
 		if v.Metric == "CPUS" {
@@ -75,6 +81,7 @@ func (r *Region) CPUUsage() int {
 	return -1
 }
 
+// CPULimit returns the CPU quota limit for a given region
 func (r *Region) CPULimit() int {
 	for _, v := range r.Quotas {
 		if v.Metric == "CPUS" {
