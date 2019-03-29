@@ -124,9 +124,10 @@ validate_nodes() {
       jq -r '.status.nodeInfo.kubeletVersion')
     # Strip out the gke patch number to compare with NEW_K8S_VER
     VER=$(strip_gke_ver "${NODE_VER}")
-    if ! compare_semver "$VER" "$NEW_K8S_VER"; then
+    NEW_VER=$(strip_gke_ver "${NEW_K8S_VER}")
+    if ! compare_semver "$VER" "$NEW_VER"; then
       echo -n "ERROR: ${NODE} has version ${VER}, "
-      echo "but should have ${NEW_K8S_VER}"
+      echo "but should have ${NEW_VER}"
       return 1
     fi
   done
