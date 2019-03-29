@@ -4,28 +4,28 @@ load("@io_bazel_rules_docker//container:container.bzl", "container_image", "cont
 go_library(
     name = "go_default_library",
     srcs = ["main.go"],
-    importpath = "github.com/GoogleCloudPlatform/gke-rolling-updates-demo/manager",
+    importpath = "github.com/GoogleCloudPlatform/gke-rolling-updates-demo/placer",
     visibility = ["//visibility:private"],
-    deps = ["//manager/cmd:go_default_library"],
+    deps = ["//placer/cmd:go_default_library"],
 )
 
 go_binary(
-    name = "manager",
+    name = "placer",
     embed = [":go_default_library"],
     visibility = ["//visibility:public"],
 )
 
 container_image(
-    name = "manager_image",
-    files = ["//manager:manager"],
-    cmd = ["manager"],
+    name = "placer_image",
+    files = ["//placer:placer"],
+    cmd = ["placer"],
 )
 
 container_push(
-    name = "push_manager_image",
-    image = ":manager_image",
+    name = "push_placer_image",
+    image = ":placer_image",
     format = "Docker",
     registry = "gcr.io",
-    repository = "seymourd-sandbox/pso-helmsman/manager",
+    repository = "seymourd-sandbox/pso-helmsman/placer",
     tag = "dev",
 )
