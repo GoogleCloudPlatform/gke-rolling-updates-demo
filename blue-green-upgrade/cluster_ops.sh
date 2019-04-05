@@ -67,7 +67,7 @@ export CLOUDSDK_CORE_DISABLE_PROMPTS
 
 # Set GCLOUD_REGION to default if it has not yet been set
 GCLOUD_REGION_DEFAULT=$(gcloud config get-value compute/region)
-if [ "${GCLOUD_REGION_DEFAULT}" == "(unset)" ]; then
+if [ -z ${GCLOUD_REGION_DEFAULT:+exists} ]; then
  # check if defined in env file
  if [ -z ${GCLOUD_REGION:+exists} ]; then
    fail "GCLOUD_REGION is not set"
@@ -79,7 +79,7 @@ fi
 
 # Set GCLOUD_PROJECT to default if it has not yet been set
 GCLOUD_PROJECT_DEFAULT=$(gcloud config get-value project)
-if [ "${GCLOUD_PROJECT_DEFAULT}" == "(unset)" ]; then
+if [ -z ${GCLOUD_PROJECT_DEFAULT:+exists} ]; then
  # check if defined in env file
  if [ -z ${GCLOUD_PROJECT:+exists} ]; then
    fail "GCLOUD_PROJECT is not set"
@@ -131,10 +131,10 @@ load_data() {
 
   # Here we load the actual data.
   echo "Loading Shakespeare sample data into Elasticsearch"
-  curl -H "Content-Type: application/x-ndjson" \
-    -X POST \
-    --data-binary @"${REPO_HOME}/data/shakespeare.json" \
-    'http://localhost:9200/shakespeare/doc/_bulk?pretty' > /dev/null
+  curl -s -H "Content-Type: application/x-ndjson" \
+    -XPOST \
+    'http://localhost:9200/shakespeare/doc/_bulk?pretty' \
+    --data-binary @"${REPO_HOME}/data/shakespeare.json" > /dev/null
 
   # If we've made it this far the data is loaded
   echo "Sample data successfully loaded!"

@@ -59,7 +59,7 @@ fi
 
 # Set GCLOUD_ZONE to default if it has not yet been set
 GCLOUD_ZONE_DEFAULT=$(gcloud config get-value compute/zone)
-if [ "${GCLOUD_ZONE_DEFAULT}" == "(unset)" ]; then
+if [ -z ${GCLOUD_ZONE_DEFAULT:+exists} ]; then
  # check if defined in env file
  if [ -z ${GCLOUD_ZONE:+exists} ]; then
    fail "GCLOUD_ZONE is not set"
@@ -71,7 +71,7 @@ fi
 
 # Set GCLOUD_REGION to default if it has not yet been set
 GCLOUD_REGION_DEFAULT=$(gcloud config get-value compute/region)
-if [ "${GCLOUD_REGION_DEFAULT}" == "(unset)" ]; then
+if [ -z ${GCLOUD_REGION_DEFAULT:+exists} ]; then
  # check if defined in env file
  if [ -z ${GCLOUD_REGION:+exists} ]; then
    fail "GCLOUD_REGION is not set"
@@ -83,7 +83,7 @@ fi
 
 # Set GCLOUD_PROJECT to default if it has not yet been set
 GCLOUD_PROJECT_DEFAULT=$(gcloud config get-value project)
-if [ "${GCLOUD_PROJECT_DEFAULT}" == "(unset)" ]; then
+if [ -z ${GCLOUD_PROJECT_DEFAULT:+exists} ]; then
  # check if defined in env file
  if [ -z ${GCLOUD_PROJECT:+exists} ]; then
    fail "GCLOUD_PROJECT is not set"
