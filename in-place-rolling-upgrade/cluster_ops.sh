@@ -94,7 +94,7 @@ else
 fi
 
 if [ -z ${CLUSTER_NAME:+exists} ]; then
-  CLUSTER_NAME="in-place-upgrade"
+  CLUSTER_NAME="rolling-upgrade-test"
   export CLUSTER_NAME
 fi
 
@@ -153,13 +153,27 @@ create_cluster() {
 }
 
 upgrade_control() {
-  cd "$SCRIPT_HOME"
-  terraform_apply "${NEW_GKE_VER}" "${GKE_VER}"
+  echo ""
+  echo "Upgrading the K8s control plane ....."
+  echo ""
+  gcloud container clusters upgrade "${CLUSTER_NAME}" \
+    --cluster-version="${NEW_K8S_VER}" \
+    --region "${GCLOUD_REGION}" \
+    --project "${GCLOUD_PROJECT}" \
+    --master \
+    --quiet
 }
 
+## updgrade the node clusters
 upgrade_nodes() {
-  cd "$SCRIPT_HOME"
-  terraform_apply "${NEW_GKE_VER}" "${NEW_GKE_VER}"
+  echo ""
+  echo "Upgrading the K8s nodes ....."
+  echo ""
+  gcloud container clusters upgrade "${CLUSTER_NAME}" \
+    --cluster-version="${NEW_K8S_VER}" \
+    --region "${GCLOUD_REGION}" \
+    --project "${GCLOUD_PROJECT}" \
+    --quiet
 }
 
 downgrade_nodes() {
@@ -183,7 +197,7 @@ tear_down() {
     -var timeout_delete="${TIMEOUT_DELETE}"
 }
 
-# After the new node pool is created, the control plane instances get upgraded
+# After the master is upgraded, the control plane instances get upgraded
 # and all other cluster operations will fail until the upgrade has completed.
 wait_for_upgrade() {
   echo "Checking for master upgrade"
@@ -207,6 +221,7 @@ auto() {
   upgrade_control
   wait_for_upgrade
   upgrade_nodes
+  wait_for_upgrade
   "${SCRIPT_HOME}/validate.sh"
 }
 
