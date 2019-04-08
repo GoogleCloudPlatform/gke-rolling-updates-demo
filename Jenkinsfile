@@ -79,11 +79,11 @@ spec:
           sh "make lint"
       }
     }
-    stage('expand-contract-upgrade') {
-        container('k8s-node') {
-             sh 'make expand-contract-upgrade'
-        }
-    }
+    // stage('expand-contract-upgrade') {
+    //     container('k8s-node') {
+    //          sh 'make expand-contract-upgrade'
+    //     }
+    // }
     stage('in-place-rolling-upgrade') {
         container('k8s-node') {
           sh 'make in-place-rolling-upgrade'
