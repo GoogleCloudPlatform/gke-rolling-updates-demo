@@ -183,9 +183,29 @@ tear_down() {
     -var timeout_delete="${TIMEOUT_DELETE}"
 }
 
+# After the new node pool is created, the control plane instances get upgraded
+# and all other cluster operations will fail until the upgrade has completed.
+wait_for_upgrade() {
+  echo "Checking for master upgrade"
+  OP_ID=$(gcloud container operations list \
+    --project "${GCLOUD_PROJECT}" \
+    --region "${GCLOUD_REGION}" \
+    --filter 'TYPE=UPGRADE_MASTER' \
+    --filter 'STATUS=RUNNING' \
+    --format 'value(name)' |
+    head -n1)
+  if [[ "${OP_ID}" =~ ^operation-.* ]]; then
+    echo "Master upgrade in process.  Waiting until complete..."
+    gcloud container operations wait "${OP_ID}" \
+      --region "${GCLOUD_REGION}" \
+      --project "${GCLOUD_PROJECT}"
+  fi
+}
+
 auto() {
   create_cluster
   upgrade_control
+  wait_for_upgrade
   upgrade_nodes
   "${SCRIPT_HOME}/validate.sh"
 }
