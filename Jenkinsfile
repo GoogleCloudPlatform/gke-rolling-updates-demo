@@ -25,8 +25,7 @@ limitations under the License.
 pipeline {
   agent {
     kubernetes {
-      label 'k8s-infra'
-      defaultContainer 'k8s-node'
+      label 'k8s-infra-rolling-upgrades'
       yaml """
 apiVersion: v1
 kind: Pod
@@ -35,10 +34,35 @@ metadata:
     jenkins: build-node
 spec:
   containers:
-  - name: k8s-node
+  - name: k8s-node-expand-contract
     image: gcr.io/pso-helmsman-cicd/jenkins-k8s-node:${env.CONTAINER_VERSION}
     command: ['cat']
     tty: true
+    env:
+    - name: KUBECONFIG
+      value: /home/jenkins/.kube/expand-contract-config
+    volumeMounts:
+    # Mount the dev service account key
+    - name: dev-key
+      mountPath: /home/jenkins/dev
+  - name: k8s-node-rolling-upgrade
+    image: gcr.io/pso-helmsman-cicd/jenkins-k8s-node:${env.CONTAINER_VERSION}
+    command: ['cat']
+    tty: true
+    env:
+    - name: KUBECONFIG
+      value: /home/jenkins/.kube/rolling-upgrade-config
+    volumeMounts:
+    # Mount the dev service account key
+    - name: dev-key
+      mountPath: /home/jenkins/dev
+  - name: k8s-node-blue-green
+    image: gcr.io/pso-helmsman-cicd/jenkins-k8s-node:${env.CONTAINER_VERSION}
+    command: ['cat']
+    tty: true
+    env:
+    - name: KUBECONFIG
+      value: /home/jenkins/.kube/blue-green-config
     volumeMounts:
     # Mount the dev service account key
     - name: dev-key
@@ -91,14 +115,20 @@ spec:
     }
     stage('Configure environment') {
       steps {
-        container('k8s-node') {
+        container('k8s-node-expand-contract') {
+          sh './test/configure-jenkins-environment.sh'
+        }
+        container('k8s-node-rolling-upgrade') {
+          sh './test/configure-jenkins-environment.sh'
+        }
+        container('k8s-node-blue-green') {
           sh './test/configure-jenkins-environment.sh'
         }
       }
     }
     stage('Lint') {
       steps {
-        container('k8s-node') {
+        container('k8s-node-expand-contract') {
           sh "make lint"
         }
       }
@@ -107,31 +137,43 @@ spec:
       parallel {
         stage('Expand/Contract Upgrade') {
           steps {
-            sh 'make expand-contract-upgrade'
+            container('k8s-node-expand-contract') {
+              sh 'make expand-contract-upgrade'
+            }
           }
           post {
             always {
-              sh 'make expand-contract-upgrade-delete'
+              container('k8s-node-expand-contract') {
+                sh 'make expand-contract-upgrade-delete'
+              }
             }
           }
         }
         stage('In-Place Rolling Upgrade') {
           steps {
-            sh 'make in-place-rolling-upgrade'
+            container('k8s-node-rolling-upgrade') {
+              sh 'make in-place-rolling-upgrade'
+            }
           }
           post {
             always {
-              sh 'make in-place-rolling-upgrade-delete'
+              container('k8s-node-rolling-upgrade') {
+                sh 'make in-place-rolling-upgrade-delete'
+              }
             }
           }
         }
         stage('Blue/Green Upgrade') {
           steps {
-            sh 'make blue-green-upgrade'
+            container('k8s-node-blue-green') {
+              sh 'make blue-green-upgrade'
+            }
           }
           post {
             always {
-              sh 'make blue-green-upgrade-delete'
+              container('k8s-node-blue-green') {
+                sh 'make blue-green-upgrade-delete'
+              }
             }
           }
         }

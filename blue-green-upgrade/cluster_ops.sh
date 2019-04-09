@@ -72,10 +72,11 @@ load_data() {
 # Installs the hello appF
 install_app() {
   echo "Installing Elasticsearch Cluster"
-  kubectl -n default apply -f "${REPO_HOME}/manifests/es-discovery-svc.yaml"
-  kubectl -n default apply -f "${REPO_HOME}/manifests/es-svc.yaml"
-  kubectl -n default apply -f "${REPO_HOME}/manifests/es-master-pdb.yaml"
-  kubectl -n default apply -f "${REPO_HOME}/manifests/es-master.yaml"
+  hostname
+  kubectl -n default create -f "${REPO_HOME}/manifests/es-discovery-svc.yaml"
+  kubectl -n default create -f "${REPO_HOME}/manifests/es-svc.yaml"
+  kubectl -n default create -f "${REPO_HOME}/manifests/es-master-pdb.yaml"
+  kubectl -n default create -f "${REPO_HOME}/manifests/es-master.yaml"
   kubectl -n default rollout status -f "${REPO_HOME}/manifests/es-master.yaml"
 
   kubectl -n default apply -f "${REPO_HOME}/manifests/es-client-pdb.yaml"
