@@ -18,18 +18,10 @@
 
 set -euo pipefail
 
-SCRIPT_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-
 fail() {
   echo "ERROR: ${*}"
   exit 2
 }
-
-# Validate that this workstation has access to the required executables
-command -v kubectl >/dev/null || fail "kubectl is not installed!"
-command -v terraform >/dev/null || fail "terraform is not installed!"
-command -v gcloud >/dev/null || fail "gcloud is not installed!"
 
 # Print usage when needed
 usage() {
@@ -46,73 +38,12 @@ EOM
   exit 1
 }
 
-# If no parameters are provided, print usage
-if [[ $# -lt 1 ]]; then
-  usage
-fi
-
-# Source the configuration file if it exists
-if [ -f "${REPO_HOME}/.env" ]; then
-  # shellcheck source=.env
-  source "${REPO_HOME}/.env"
-fi
-
-# Set GCLOUD_ZONE to default if it has not yet been set
-GCLOUD_ZONE_DEFAULT=$(gcloud config get-value compute/zone)
-if [ "${GCLOUD_ZONE_DEFAULT}" == "(unset)" ]; then
-  # check if defined in env file
-  if [ -z ${GCLOUD_ZONE:+exists} ]; then
-    fail "GCLOUD_ZONE is not set"
-  fi
-else
-  GCLOUD_ZONE="$GCLOUD_ZONE_DEFAULT"
-  export GCLOUD_ZONE
-fi
-
-# Set GCLOUD_REGION to default if it has not yet been set
-GCLOUD_REGION_DEFAULT=$(gcloud config get-value compute/region)
-if [ "${GCLOUD_REGION_DEFAULT}" == "(unset)" ]; then
-  # check if defined in env file
-  if [ -z ${GCLOUD_REGION:+exists} ]; then
-    fail "GCLOUD_REGION is not set"
-  fi
-else
-  GCLOUD_REGION="$GCLOUD_REGION_DEFAULT"
-  export GCLOUD_REGION
-fi
-
-# Set GCLOUD_PROJECT to default if it has not yet been set
-GCLOUD_PROJECT_DEFAULT=$(gcloud config get-value project)
-if [ "${GCLOUD_PROJECT_DEFAULT}" == "(unset)" ]; then
-  # check if defined in env file
-  if [ -z ${GCLOUD_PROJECT:+exists} ]; then
-    fail "GCLOUD_PROJECT is not set"
-  fi
-else
-  GCLOUD_PROJECT="$GCLOUD_PROJECT_DEFAULT"
-  export GCLOUD_PROJECT
-fi
-
-if [ -z ${CLUSTER_NAME:+exists} ]; then
-  CLUSTER_NAME="rolling-upgrade-test"
-  export CLUSTER_NAME
-fi
-
-# Check that the GKE_VER variable has been set
-if [ -z ${GKE_VER:+exists} ]; then
-  fail "Set the GKE_VER environment variable"
-fi
-
-# Check that the NEW_GKE_VER variable has been set
-if [ -z ${NEW_GKE_VER:+exists} ]; then
-  fail "Set the NEW_GKE_VER environment variable"
-fi
-
 terraform_apply() {
   CONTROL_PLANE_VERSION=$1
   NODE_POOL_VERSION=$2
 
   terraform plan -input=false \
+    -var cluster_name="${CLUSTER_NAME}" \
     -var control_plane_version="${CONTROL_PLANE_VERSION}" \
     -var node_pool_version="${NODE_POOL_VERSION}" \
     -var machine_type="${MACHINE_TYPE}" \
@@ -121,6 +52,7 @@ terraform_apply() {
     -var zone="${GCLOUD_ZONE}"
 
   terraform apply -input=false -auto-approve \
+    -var cluster_name="${CLUSTER_NAME}" \
     -var control_plane_version="${CONTROL_PLANE_VERSION}" \
     -var node_pool_version="${NODE_POOL_VERSION}" \
     -var machine_type="${MACHINE_TYPE}" \
@@ -143,7 +75,7 @@ create_cluster() {
   terraform_apply "${GKE_VER}" "${GKE_VER}"
 
   # Acquire the kubectl credentials
-  gcloud container clusters get-credentials "rolling-upgrade-test" \
+  gcloud container clusters get-credentials "${CLUSTER_NAME}" \
     --region "${GCLOUD_REGION}" \
     --project "${GCLOUD_PROJECT}"
 
@@ -186,6 +118,7 @@ tear_down() {
   terraform init
   terraform destroy \
     -auto-approve \
+    -var cluster_name="${CLUSTER_NAME}" \
     -var control_plane_version="${NEW_GKE_VER}" \
     -var node_pool_version="${GKE_VER}" \
     -var machine_type="${MACHINE_TYPE}" \
@@ -204,8 +137,7 @@ wait_for_upgrade() {
   OP_ID=$(gcloud container operations list \
     --project "${GCLOUD_PROJECT}" \
     --region "${GCLOUD_REGION}" \
-    --filter 'TYPE=UPGRADE_MASTER' \
-    --filter 'STATUS=RUNNING' \
+    --filter "TYPE=UPGRADE_MASTER AND STATUS=RUNNING AND targetLink:${CLUSTER_NAME}" \
     --format 'value(name)' |
     head -n1)
   if [[ "${OP_ID}" =~ ^operation-.* ]]; then
@@ -225,27 +157,105 @@ auto() {
   "${SCRIPT_HOME}/validate.sh"
 }
 
-ACTION=$1
-case "${ACTION}" in
-auto)
-  auto
-  ;;
-create)
-  create_cluster
-  ;;
-upgrade-control)
-  upgrade_control
-  ;;
-upgrade-nodes)
-  upgrade_nodes
-  ;;
-downgrade-nodes)
-  downgrade_nodes
-  ;;
-delete)
-  tear_down
-  ;;
-*)
-  usage
-  ;;
-esac
+main() {
+  SCRIPT_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  REPO_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+  # Validate that this workstation has access to the required executables
+  command -v kubectl >/dev/null || fail "kubectl is not installed!"
+  command -v terraform >/dev/null || fail "terraform is not installed!"
+  command -v gcloud >/dev/null || fail "gcloud is not installed!"
+
+  # If no parameters are provided, print usage
+  if [[ $# -lt 1 ]]; then
+    usage
+  fi
+
+  # Source the configuration file if it exists
+  if [ -f "${REPO_HOME}/.env" ]; then
+    # shellcheck source=.env
+    source "${REPO_HOME}/.env"
+  fi
+
+  # Set GCLOUD_ZONE to default if it has not yet been set
+  GCLOUD_ZONE_DEFAULT=$(gcloud config get-value compute/zone)
+  if [ "${GCLOUD_ZONE_DEFAULT}" == "(unset)" ]; then
+    # check if defined in env file
+    if [ -z ${GCLOUD_ZONE:+exists} ]; then
+      fail "GCLOUD_ZONE is not set"
+    fi
+  else
+    GCLOUD_ZONE="$GCLOUD_ZONE_DEFAULT"
+    export GCLOUD_ZONE
+  fi
+
+  # Set GCLOUD_REGION to default if it has not yet been set
+  GCLOUD_REGION_DEFAULT=$(gcloud config get-value compute/region)
+  if [ "${GCLOUD_REGION_DEFAULT}" == "(unset)" ]; then
+    # check if defined in env file
+    if [ -z ${GCLOUD_REGION:+exists} ]; then
+      fail "GCLOUD_REGION is not set"
+    fi
+  else
+    GCLOUD_REGION="$GCLOUD_REGION_DEFAULT"
+    export GCLOUD_REGION
+  fi
+
+  # Set GCLOUD_PROJECT to default if it has not yet been set
+  GCLOUD_PROJECT_DEFAULT=$(gcloud config get-value project)
+  if [ "${GCLOUD_PROJECT_DEFAULT}" == "(unset)" ]; then
+    # check if defined in env file
+    if [ -z ${GCLOUD_PROJECT:+exists} ]; then
+      fail "GCLOUD_PROJECT is not set"
+    fi
+  else
+    GCLOUD_PROJECT="$GCLOUD_PROJECT_DEFAULT"
+    export GCLOUD_PROJECT
+  fi
+
+  # Set CLUSTER_NAME
+  if [ -z ${CLUSTER_NAME:+exists} ]; then
+    CLUSTER_NAME="rolling-upgrade-test"
+    if [ ! -z ${BUILD_NUMBER:+exists} ]; then
+      CLUSTER_NAME="${CLUSTER_NAME}-${BUILD_NUMBER}"
+    fi
+    export CLUSTER_NAME
+  fi
+
+  # Check that the GKE_VER variable has been set
+  if [ -z ${GKE_VER:+exists} ]; then
+    fail "Set the GKE_VER environment variable"
+  fi
+
+  # Check that the NEW_GKE_VER variable has been set
+  if [ -z ${NEW_GKE_VER:+exists} ]; then
+    fail "Set the NEW_GKE_VER environment variable"
+  fi
+
+  ACTION=$1
+  case "${ACTION}" in
+  auto)
+    auto
+    ;;
+  create)
+    create_cluster
+    ;;
+  upgrade-control)
+    upgrade_control
+    ;;
+  upgrade-nodes)
+    upgrade_nodes
+    ;;
+  downgrade-nodes)
+    downgrade_nodes
+    ;;
+  delete)
+    tear_down
+    ;;
+  *)
+    usage
+    ;;
+  esac
+}
+
+main "$@"

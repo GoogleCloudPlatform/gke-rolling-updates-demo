@@ -179,10 +179,10 @@ validate_elasticsearch() {
   fi
 
   echo "Setting up port-forward to Elasticsearch Client..."
-  kubectl -n default port-forward svc/elasticsearch 9200:9200 1>&2>/dev/null &
+  kubectl -n default port-forward svc/elasticsearch 9201:9200 1>&2>/dev/null &
   sleep 4
   # Check for Shakespeare search index
-  SHAKESPEARE_INDEX=$(curl -o /dev/null -w "%{http_code}" http://localhost:9200/shakespeare 2>/dev/null)
+  SHAKESPEARE_INDEX=$(curl -o /dev/null -w "%{http_code}" http://localhost:9201/shakespeare 2>/dev/null)
   if ! [[ "$SHAKESPEARE_INDEX" == "200" ]]; then
     echo "ERROR: Shakespeare Index is not available."
     return 1

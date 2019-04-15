@@ -27,7 +27,7 @@ data "google_container_engine_versions" "my_zone" {
 // This resource creates an HA Regional GKE cluster
 // https://www.terraform.io/docs/providers/google/r/container_cluster.html
 resource "google_container_cluster" "test" {
-  name   = "rolling-upgrade-test"
+  name   = "${var.cluster_name}"
   region = "${var.region}"
 
   // in a regional cluster, this is the number of nodes per zone
@@ -39,6 +39,7 @@ resource "google_container_cluster" "test" {
   // We specify the machine type for the node pool instances.
   node_config {
     machine_type = "${var.machine_type}"
+
     metadata {
       disable-legacy-endpoints = "true"
     }
