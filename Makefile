@@ -82,3 +82,6 @@ check_headers:
 	@echo "Checking file headers"
 	@python test/verify_boilerplate.py
 
+.PHONY: test
+test:
+	@bazel test //...

@@ -79,6 +79,11 @@ spec:
           sh "make lint"
       }
     }
+    stage('Test manager') {
+        container(containerName) {
+          sh "make test"
+      }
+    }
     stage('expand-contract-upgrade') {
         container('k8s-node') {
              sh 'make expand-contract-upgrade'
