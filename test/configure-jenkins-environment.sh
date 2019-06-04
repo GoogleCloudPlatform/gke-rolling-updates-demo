@@ -22,10 +22,6 @@ function test_versions() {
   }
   to="$(echo "$toVersionShortName" | sed s/-gke//g | tr -d '.')"
   from="$(echo "$fromVersionShortName" | sed s/-gke//g | tr -d '.')"
-  test "${to}" -gt "${from}" || {
-    echo >&2 'toVersion is older than fromVersion.. Aborting'
-    exit 1
-  }
 }
 
 # All of the scripts expect to find ".env" in the root folder
