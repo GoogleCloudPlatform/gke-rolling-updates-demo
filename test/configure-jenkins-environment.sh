@@ -20,8 +20,8 @@ function test_versions() {
     echo >&2 'toVersion and fromVersion selected are equal.. Aborting'
     exit 1
   }
-  to="$(echo "$toVersionShortName" | sed s/-gke//g | tr -d '.')"
-  from="$(echo "$fromVersionShortName" | sed s/-gke//g | tr -d '.')"
+  #to="$(echo "$toVersionShortName" | sed s/-gke//g | tr -d '.')"
+  #from="$(echo "$fromVersionShortName" | sed s/-gke//g | tr -d '.')"
 }
 
 # All of the scripts expect to find ".env" in the root folder

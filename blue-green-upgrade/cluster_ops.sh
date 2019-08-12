@@ -264,7 +264,7 @@ main() {
 
   # Source the properties file
   if [ -f "${REPO_HOME}/.env" ] ; then
-    # shellcheck source=.env
+    # shellcheck source=.env disable=SC1091
     source "${REPO_HOME}/.env"
   else
     echo "ERROR: Define a properties file '.env'"

@@ -35,7 +35,7 @@ metadata:
 spec:
   containers:
   - name: k8s-node-expand-contract
-    image: gcr.io/pso-helmsman-cicd/jenkins-k8s-node:${env.CONTAINER_VERSION}
+    image: gcr.io/pso-helmsman-cicd/jenkins-k8s-node:${env.JENKINS_CONTAINER_VERSION}
     command: ['cat']
     tty: true
     env:
@@ -46,7 +46,7 @@ spec:
     - name: dev-key
       mountPath: /home/jenkins/dev
   - name: k8s-node-rolling-upgrade
-    image: gcr.io/pso-helmsman-cicd/jenkins-k8s-node:${env.CONTAINER_VERSION}
+    image: gcr.io/pso-helmsman-cicd/jenkins-k8s-node:${env.JENKINS_CONTAINER_VERSION}
     command: ['cat']
     tty: true
     env:
@@ -57,7 +57,7 @@ spec:
     - name: dev-key
       mountPath: /home/jenkins/dev
   - name: k8s-node-blue-green
-    image: gcr.io/pso-helmsman-cicd/jenkins-k8s-node:${env.CONTAINER_VERSION}
+    image: gcr.io/pso-helmsman-cicd/jenkins-k8s-node:${env.JENKINS_CONTAINER_VERSION}
     command: ['cat']
     tty: true
     env:

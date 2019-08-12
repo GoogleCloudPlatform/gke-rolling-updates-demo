@@ -173,7 +173,7 @@ main() {
 
   # Source the configuration file if it exists
   if [ -f "${REPO_HOME}/.env" ]; then
-    # shellcheck source=.env
+    # shellcheck source=.env disable=SC1091
     source "${REPO_HOME}/.env"
   fi
 

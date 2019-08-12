@@ -22,10 +22,10 @@ limitations under the License.
 
 // Display the available control plane versions for your zone
 output "available_control_plane_versions" {
-  value = "${data.google_container_engine_versions.my_zone.valid_master_versions}"
+  value = data.google_container_engine_versions.my_zone.valid_master_versions
 }
 
 // Display the available node pool versions for your zone
 output "available_node_versions" {
-  value = "${data.google_container_engine_versions.my_zone.valid_node_versions}"
+  value = data.google_container_engine_versions.my_zone.valid_node_versions
 }

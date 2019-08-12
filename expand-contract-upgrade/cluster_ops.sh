@@ -312,7 +312,7 @@ main() {
   ## source properties file
   SCRIPT_HOME="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
   REPO_HOME="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
-  # shellcheck source=.env
+  # shellcheck source=.env disable=SC1091
   source "${REPO_HOME}/.env"
 
   if [ -z ${CLUSTER_NAME:+exists} ]; then

@@ -21,5 +21,5 @@ limitations under the License.
 
 
 provider "google" {
-  version = "~> v1.13"
+  version = "~> 2.12.0"
 }
