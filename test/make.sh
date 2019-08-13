@@ -48,11 +48,10 @@ function docker() {
 # files ending in '.tf'
 function check_terraform() {
   echo "Running terraform validate"
-  #shellcheck disable=SC2156
-  cd in-place-rolling-upgrade || return
+  REPO_ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
+  cd "${REPO_ROOT}/in-place-rolling-upgrade" || exit
   terraform init
   terraform validate
-  cd .. || return
 }
 
 # This function runs 'go fmt' and 'go vet' on eery file
