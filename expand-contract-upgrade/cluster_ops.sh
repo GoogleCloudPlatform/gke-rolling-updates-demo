@@ -241,7 +241,7 @@ upgrade_nodes() {
   echo "Upgrading the K8s nodes ....."
   echo ""
   gcloud container clusters upgrade "${CLUSTER_NAME}" \
-    --cluster-version="${NEW_K8S_VER}" \
+    --cluster-version="${NEW_GKE_VER}" \
     --region "${GCLOUD_REGION}" \
     --project "${GCLOUD_PROJECT}" \
     --quiet
@@ -253,6 +253,12 @@ tear_down() {
   echo ""
   echo "Tearing down the infrastructure ....."
   echo ""
+  gcloud container clusters list | grep expand-contract-upgrade
+  retVal=$?
+  if [ $retVal -ne 0 ]; then
+    echo "Nothing to tear down"
+    return
+  fi  
   uninstall_app
   delete_cluster
 }
